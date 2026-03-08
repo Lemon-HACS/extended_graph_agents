@@ -1,6 +1,6 @@
 {
-  "name": "extended_graph_agents",
-  "content_in_root": false,
+  "name": "Extended Graph Agents",
   "render_readme": true,
+  "homeassistant": "2026.2.0",
   "iot_class": "cloud_polling"
 }

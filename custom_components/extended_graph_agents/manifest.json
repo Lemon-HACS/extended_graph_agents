@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "requirements": ["openai>=1.0.0", "pyyaml>=6.0"],
   "dependencies": [],
-  "codeowners": [],
+  "codeowners": ["@LemonDouble"],
   "iot_class": "cloud_polling",
   "integration_type": "hub",
   "config_flow": true
