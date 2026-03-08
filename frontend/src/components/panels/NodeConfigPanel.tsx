@@ -1,0 +1,498 @@
+import { useCallback } from "react";
+import { useGraphStore } from "../../store/graphStore";
+import type { GraphNode, FunctionTool, RouteConfig } from "../../types";
+
+interface NodeConfigPanelProps {
+  onClose: () => void;
+}
+
+export function NodeConfigPanel({ onClose }: NodeConfigPanelProps) {
+  const { flowNodes, selectedNodeId, updateNodeData } = useGraphStore();
+  const selectedNode = flowNodes.find((n) => n.id === selectedNodeId);
+
+  if (!selectedNode) return null;
+
+  const data = selectedNode.data as unknown as GraphNode;
+
+  const update = useCallback(
+    (field: string, value: unknown) => {
+      updateNodeData(selectedNode.id, { [field]: value });
+    },
+    [selectedNode.id, updateNodeData]
+  );
+
+  return (
+    <div
+      style={{
+        width: 380,
+        background: "#0f172a",
+        borderLeft: "1px solid #1e293b",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          padding: "16px",
+          borderBottom: "1px solid #1e293b",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <div>
+          <div style={{ color: "#94a3b8", fontSize: 11, marginBottom: 2 }}>
+            {data.type === "router" ? "🔀 ROUTER" : "🤖 AGENT"}
+          </div>
+          <div style={{ color: "white", fontWeight: 600 }}>Node Config</div>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#94a3b8",
+            cursor: "pointer",
+            fontSize: 18,
+            lineHeight: 1,
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Scrollable content */}
+      <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+        {/* Common fields */}
+        <Field label="Node ID">
+          <input value={data.id} readOnly style={inputStyle} />
+        </Field>
+
+        <Field label="Name">
+          <input
+            value={data.name ?? ""}
+            onChange={(e) => update("name", e.target.value)}
+            style={inputStyle}
+          />
+        </Field>
+
+        <Field label="Model (optional)">
+          <input
+            value={data.model ?? ""}
+            onChange={(e) => update("model", e.target.value || undefined)}
+            placeholder="gpt-4o (inherited from graph)"
+            style={inputStyle}
+          />
+        </Field>
+
+        <Field label="System Prompt">
+          <textarea
+            value={data.prompt ?? ""}
+            onChange={(e) => update("prompt", e.target.value)}
+            rows={6}
+            style={{ ...inputStyle, fontFamily: "monospace", resize: "vertical" }}
+          />
+        </Field>
+
+        {/* Router-specific */}
+        {data.type === "router" && (
+          <RouterConfig data={data} update={update} />
+        )}
+
+        {/* Regular-specific */}
+        {data.type === "regular" && (
+          <RegularConfig data={data} update={update} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RouterConfig({
+  data,
+  update,
+}: {
+  data: GraphNode;
+  update: (f: string, v: unknown) => void;
+}) {
+  const routes = data.routes ?? [];
+
+  const addRoute = () => {
+    update("routes", [
+      ...routes,
+      { match: "", next: [], mode: "sequential" },
+    ]);
+  };
+
+  const updateRoute = (i: number, field: keyof RouteConfig, value: unknown) => {
+    const newRoutes = routes.map((r, idx) =>
+      idx === i ? { ...r, [field]: value } : r
+    );
+    update("routes", newRoutes);
+  };
+
+  const removeRoute = (i: number) => {
+    update("routes", routes.filter((_, idx) => idx !== i));
+  };
+
+  return (
+    <div>
+      <Field label="Output Key">
+        <input
+          value={data.output_key ?? "route"}
+          onChange={(e) => update("output_key", e.target.value)}
+          style={inputStyle}
+        />
+      </Field>
+
+      <div style={{ marginTop: 16 }}>
+        <div
+          style={{
+            color: "#94a3b8",
+            fontSize: 12,
+            marginBottom: 8,
+            fontWeight: 600,
+          }}
+        >
+          ROUTES
+        </div>
+        {routes.map((route, i) => (
+          <div
+            key={i}
+            style={{
+              background: "#1e293b",
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 8,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 8,
+              }}
+            >
+              <span style={{ color: "#94a3b8", fontSize: 11 }}>
+                Route {i + 1}
+              </span>
+              <button
+                onClick={() => removeRoute(i)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#ef4444",
+                  cursor: "pointer",
+                  fontSize: 14,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <Field label="Match Value">
+              <input
+                value={route.match}
+                onChange={(e) => updateRoute(i, "match", e.target.value)}
+                placeholder="e.g. smart_home or * for default"
+                style={inputStyle}
+              />
+            </Field>
+            <Field label="Next Node IDs (comma separated)">
+              <input
+                value={(route.next ?? []).join(", ")}
+                onChange={(e) =>
+                  updateRoute(
+                    i,
+                    "next",
+                    e.target.value
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                  )
+                }
+                style={inputStyle}
+              />
+            </Field>
+            <Field label="Execution Mode">
+              <select
+                value={route.mode ?? "sequential"}
+                onChange={(e) => updateRoute(i, "mode", e.target.value)}
+                style={inputStyle}
+              >
+                <option value="sequential">Sequential</option>
+                <option value="parallel">Parallel ∥</option>
+              </select>
+            </Field>
+          </div>
+        ))}
+        <button onClick={addRoute} style={addBtnStyle}>
+          + Add Route
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RegularConfig({
+  data,
+  update,
+}: {
+  data: GraphNode;
+  update: (f: string, v: unknown) => void;
+}) {
+  const functions = data.functions ?? [];
+  const skills = data.skills ?? [];
+
+  const addFunction = () => {
+    const newFunc: FunctionTool = {
+      spec: {
+        name: `function_${functions.length + 1}`,
+        description: "",
+        parameters: {
+          type: "object",
+          properties: {},
+          required: [],
+        },
+      },
+      function: {
+        type: "native",
+        service: "",
+        data: {},
+      },
+    };
+    update("functions", [...functions, newFunc]);
+  };
+
+  const updateFunction = (i: number, funcData: Partial<FunctionTool>) => {
+    update(
+      "functions",
+      functions.map((f, idx) => (idx === i ? { ...f, ...funcData } : f))
+    );
+  };
+
+  const removeFunction = (i: number) => {
+    update(
+      "functions",
+      functions.filter((_, idx) => idx !== i)
+    );
+  };
+
+  return (
+    <div>
+      <div style={{ marginTop: 16 }}>
+        <div
+          style={{
+            color: "#94a3b8",
+            fontSize: 12,
+            marginBottom: 8,
+            fontWeight: 600,
+          }}
+        >
+          FUNCTIONS
+        </div>
+        {functions.map((func, i) => (
+          <FunctionEditor
+            key={i}
+            index={i}
+            func={func}
+            onChange={(f) => updateFunction(i, f)}
+            onRemove={() => removeFunction(i)}
+          />
+        ))}
+        <button onClick={addFunction} style={addBtnStyle}>
+          + Add Function
+        </button>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <div
+          style={{
+            color: "#94a3b8",
+            fontSize: 12,
+            marginBottom: 8,
+            fontWeight: 600,
+          }}
+        >
+          SKILLS
+        </div>
+        <input
+          value={skills.join(", ")}
+          onChange={(e) =>
+            update(
+              "skills",
+              e.target.value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+            )
+          }
+          placeholder="skill1, skill2"
+          style={inputStyle}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FunctionEditor({
+  index,
+  func,
+  onChange,
+  onRemove,
+}: {
+  index: number;
+  func: FunctionTool;
+  onChange: (f: Partial<FunctionTool>) => void;
+  onRemove: () => void;
+}) {
+  const FUNCTION_TYPES = [
+    "native",
+    "template",
+    "script",
+    "web",
+    "bash",
+    "file",
+    "sqlite",
+  ];
+
+  return (
+    <div
+      style={{
+        background: "#1e293b",
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 8,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 8,
+        }}
+      >
+        <span style={{ color: "#94a3b8", fontSize: 11 }}>
+          Function {index + 1}
+        </span>
+        <button
+          onClick={onRemove}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#ef4444",
+            cursor: "pointer",
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      <Field label="Name">
+        <input
+          value={func.spec.name}
+          onChange={(e) =>
+            onChange({ spec: { ...func.spec, name: e.target.value } })
+          }
+          style={inputStyle}
+        />
+      </Field>
+
+      <Field label="Description">
+        <input
+          value={func.spec.description}
+          onChange={(e) =>
+            onChange({ spec: { ...func.spec, description: e.target.value } })
+          }
+          style={inputStyle}
+        />
+      </Field>
+
+      <Field label="Function Type">
+        <select
+          value={func.function.type}
+          onChange={(e) =>
+            onChange({ function: { ...func.function, type: e.target.value } })
+          }
+          style={inputStyle}
+        >
+          {FUNCTION_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      {/* Type-specific config as JSON */}
+      <Field label="Function Config (JSON)">
+        <textarea
+          value={JSON.stringify(func.function, null, 2)}
+          onChange={(e) => {
+            try {
+              const parsed = JSON.parse(e.target.value);
+              onChange({ function: parsed });
+            } catch {
+              // ignore parse errors while typing
+            }
+          }}
+          rows={4}
+          style={{
+            ...inputStyle,
+            fontFamily: "monospace",
+            fontSize: 11,
+            resize: "vertical",
+          }}
+        />
+      </Field>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <label
+        style={{
+          display: "block",
+          color: "#94a3b8",
+          fontSize: 11,
+          marginBottom: 4,
+        }}
+      >
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  background: "#0f172a",
+  border: "1px solid #334155",
+  borderRadius: 6,
+  color: "white",
+  padding: "6px 10px",
+  fontSize: 13,
+  boxSizing: "border-box",
+};
+
+const addBtnStyle: React.CSSProperties = {
+  background: "#1e3a1e",
+  border: "1px dashed #22c55e",
+  color: "#4ade80",
+  borderRadius: 6,
+  padding: "6px 12px",
+  cursor: "pointer",
+  fontSize: 12,
+  width: "100%",
+  marginTop: 4,
+};

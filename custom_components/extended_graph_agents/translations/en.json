@@ -1,0 +1,17 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Extended Graph Agents",
+        "description": "Configure your OpenAI API connection",
+        "data": {
+          "api_key": "API Key",
+          "base_url": "Base URL"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the API"
+    }
+  }
+}

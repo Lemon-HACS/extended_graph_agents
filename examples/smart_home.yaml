@@ -1,0 +1,161 @@
+id: smart_home
+name: Smart Home Assistant
+description: Routes between smart home control and general assistance using an intent classifier
+model: gpt-4o
+
+nodes:
+  - id: classify
+    type: router
+    name: Intent Classifier
+    prompt: |
+      You are an intent classifier. Classify this user request into exactly one of these categories:
+      - smart_home: The user wants to control lights, switches, thermostats, or other smart home devices
+      - research: The user wants to look something up, search the web, or get information
+      - general: Everything else
+
+      User request: {{ state.user_input }}
+
+      Respond with a JSON object with a single key "intent" and one of the above values.
+    output_key: intent
+    routes:
+      - match: smart_home
+        next: [smart_home_agent]
+        mode: sequential
+      - match: research
+        next: [web_search_agent, knowledge_agent]
+        mode: parallel
+      - match: "*"
+        next: [general_agent]
+        mode: sequential
+
+  - id: smart_home_agent
+    type: regular
+    name: Smart Home Agent
+    prompt: |
+      You are a smart home assistant. Help the user control their smart home devices.
+      Available entities are provided via your context.
+
+      User request: {{ state.user_input }}
+    functions:
+      - spec:
+          name: turn_on_light
+          description: Turn on a light or group of lights
+          parameters:
+            type: object
+            properties:
+              entity_id:
+                type: string
+                description: The entity ID of the light (e.g., light.living_room)
+              brightness_pct:
+                type: integer
+                description: Brightness percentage (0-100)
+            required:
+              - entity_id
+        function:
+          type: native
+          service: light.turn_on
+          data:
+            entity_id: "{{ entity_id }}"
+            brightness_pct: "{{ brightness_pct | default(100) }}"
+
+      - spec:
+          name: turn_off_light
+          description: Turn off a light or group of lights
+          parameters:
+            type: object
+            properties:
+              entity_id:
+                type: string
+                description: The entity ID of the light
+            required:
+              - entity_id
+        function:
+          type: native
+          service: light.turn_off
+          data:
+            entity_id: "{{ entity_id }}"
+
+      - spec:
+          name: set_temperature
+          description: Set the thermostat temperature
+          parameters:
+            type: object
+            properties:
+              entity_id:
+                type: string
+                description: The climate entity ID
+              temperature:
+                type: number
+                description: Target temperature in degrees
+            required:
+              - entity_id
+              - temperature
+        function:
+          type: native
+          service: climate.set_temperature
+          data:
+            entity_id: "{{ entity_id }}"
+            temperature: "{{ temperature }}"
+
+      - spec:
+          name: get_entity_state
+          description: Get the current state of any Home Assistant entity
+          parameters:
+            type: object
+            properties:
+              entity_id:
+                type: string
+                description: The entity ID to check
+            required:
+              - entity_id
+        function:
+          type: template
+          value_template: >
+            {% set state = states(entity_id) %}
+            {% set attrs = state_attr(entity_id, None) %}
+            Entity {{ entity_id }}: state={{ state }}
+    skills: []
+
+  - id: web_search_agent
+    type: regular
+    name: Web Search Agent
+    prompt: |
+      You are a research assistant. Search for information relevant to the user's request.
+      User request: {{ state.user_input }}
+    functions:
+      - spec:
+          name: fetch_url
+          description: Fetch content from a URL
+          parameters:
+            type: object
+            properties:
+              url:
+                type: string
+                description: The URL to fetch
+            required:
+              - url
+        function:
+          type: web
+          url: "{{ url }}"
+          method: GET
+    skills: []
+
+  - id: knowledge_agent
+    type: regular
+    name: Knowledge Agent
+    prompt: |
+      You are a knowledgeable assistant. Answer based on your training knowledge.
+      User request: {{ state.user_input }}
+    functions: []
+    skills: []
+
+  - id: general_agent
+    type: regular
+    name: General Assistant
+    prompt: |
+      You are a helpful general-purpose assistant integrated with Home Assistant.
+      Answer the user's question helpfully and concisely.
+
+      User request: {{ state.user_input }}
+    functions: []
+    skills: []
