@@ -57,6 +57,25 @@ function buildKV(entries: KVEntry[]): Record<string, string> {
   return Object.fromEntries(entries.filter((e) => e.key).map((e) => [e.key, e.value]));
 }
 
+// ── UsageHint ──────────────────────────────────────────────────────────────────
+
+function UsageHint({ text }: { text: string }) {
+  return (
+    <div style={{
+      background: "#0d1f35",
+      border: "1px solid #1e3a5f",
+      borderRadius: 6,
+      padding: "6px 10px",
+      color: "#60a5fa",
+      fontSize: 11,
+      marginBottom: 10,
+      lineHeight: 1.5,
+    }}>
+      💡 {text}
+    </div>
+  );
+}
+
 // ── Main FunctionEditor ────────────────────────────────────────────────────────
 
 export function FunctionEditor({
@@ -111,6 +130,7 @@ export function FunctionEditor({
         <input
           value={func.spec.name}
           onChange={(e) => onChange({ spec: { ...func.spec, name: e.target.value } })}
+          placeholder="get_device_state"
           style={inputStyle}
         />
       </Field>
@@ -120,6 +140,7 @@ export function FunctionEditor({
         <input
           value={func.spec.description}
           onChange={(e) => onChange({ spec: { ...func.spec, description: e.target.value } })}
+          placeholder="조명의 현재 상태를 조회합니다"
           style={inputStyle}
         />
       </Field>
@@ -140,13 +161,13 @@ export function FunctionEditor({
       {/* Parameters */}
       <div style={{ marginTop: 10 }}>
         <div style={{ color: "#64748b", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", marginBottom: 4, textTransform: "uppercase" }}>
-          Parameters
+          {t.parameters}
         </div>
         {params.map((p, i) => (
           <ParameterRow key={i} param={p} onChange={(patch) => updateParam(i, patch)} onRemove={() => removeParam(i)} />
         ))}
         <button onClick={addParam} style={{ ...addBtnStyle, marginTop: 4, fontSize: 11, padding: "4px 8px" }}>
-          + Add Parameter
+          {t.addParameter}
         </button>
       </div>
 
@@ -172,13 +193,14 @@ function ParameterRow({
   onChange: (p: Partial<Parameter>) => void;
   onRemove: () => void;
 }) {
+  const t = useLang();
   return (
     <div style={{ background: "#0f172a", borderRadius: 6, padding: "8px 10px", marginBottom: 4 }}>
       <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 4 }}>
         <input
           value={param.name}
           onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="name"
+          placeholder={t.paramNamePlaceholder}
           style={{ ...inputStyle, flex: 2, fontSize: 11 }}
         />
         <select
@@ -186,7 +208,7 @@ function ParameterRow({
           onChange={(e) => onChange({ type: e.target.value as Parameter["type"] })}
           style={{ ...inputStyle, flex: 1, fontSize: 11 }}
         >
-          {PARAM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          {PARAM_TYPES.map((tp) => <option key={tp} value={tp}>{tp}</option>)}
         </select>
         <label style={{ display: "flex", alignItems: "center", gap: 3, color: "#94a3b8", fontSize: 10, flexShrink: 0, cursor: "pointer" }}>
           <input
@@ -194,7 +216,7 @@ function ParameterRow({
             checked={param.required}
             onChange={(e) => onChange({ required: e.target.checked })}
           />
-          req
+          {t.paramRequired}
         </label>
         <button onClick={onRemove} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 11, flexShrink: 0 }}>
           ✕
@@ -203,14 +225,14 @@ function ParameterRow({
       <input
         value={param.description}
         onChange={(e) => onChange({ description: e.target.value })}
-        placeholder="description"
+        placeholder={t.paramDescPlaceholder}
         style={{ ...inputStyle, fontSize: 11, marginBottom: param.type === "string" ? 4 : 0 }}
       />
       {param.type === "string" && (
         <input
           value={param.enumValues}
           onChange={(e) => onChange({ enumValues: e.target.value })}
-          placeholder='enum values (comma separated, e.g. "read, write")'
+          placeholder={t.enumValuesPlaceholder}
           style={{ ...inputStyle, fontSize: 11 }}
         />
       )}
@@ -250,6 +272,7 @@ function TypeConfig({
 // ── NativeConfig ───────────────────────────────────────────────────────────────
 
 function NativeConfig({ config, onChange }: { config: FunctionConfig; onChange: (p: Partial<FunctionConfig>) => void }) {
+  const t = useLang();
   const data = parseKV((config.data ?? {}) as Record<string, unknown>);
 
   const updateData = (entries: KVEntry[]) => onChange({ data: buildKV(entries) });
@@ -259,28 +282,29 @@ function NativeConfig({ config, onChange }: { config: FunctionConfig; onChange: 
 
   return (
     <>
-      <Field label="Service">
+      <UsageHint text={t.nativeUsage} />
+      <Field label={t.nativeService}>
         <input
           value={(config.service as string) ?? ""}
           onChange={(e) => onChange({ service: e.target.value })}
-          placeholder="domain.service (e.g. light.turn_on)"
+          placeholder="light.turn_on"
           style={inputStyle}
         />
       </Field>
       <div>
-        <div style={{ color: "#94a3b8", fontSize: 11, marginBottom: 4 }}>Data (key → Jinja2 value)</div>
+        <div style={{ color: "#94a3b8", fontSize: 11, marginBottom: 4 }}>{t.nativeData}</div>
         {data.map((entry, i) => (
           <div key={i} style={{ display: "flex", gap: 4, marginBottom: 4 }}>
             <input
               value={entry.key}
               onChange={(e) => setEntry(i, { key: e.target.value })}
-              placeholder="key"
+              placeholder="entity_id"
               style={{ ...inputStyle, flex: 1, fontSize: 11 }}
             />
             <input
               value={entry.value}
               onChange={(e) => setEntry(i, { value: e.target.value })}
-              placeholder='{{ param }}'
+              placeholder='{{ entity_id }}'
               style={{ ...inputStyle, flex: 2, fontSize: 11, fontFamily: "monospace" }}
             />
             <button onClick={() => updateData(data.filter((_, idx) => idx !== i))}
@@ -288,7 +312,7 @@ function NativeConfig({ config, onChange }: { config: FunctionConfig; onChange: 
           </div>
         ))}
         <button onClick={() => updateData([...data, { key: "", value: "" }])} style={{ ...addBtnStyle, fontSize: 11, padding: "3px 8px" }}>
-          + Add Data Field
+          {t.addDataField}
         </button>
       </div>
     </>
@@ -298,54 +322,60 @@ function NativeConfig({ config, onChange }: { config: FunctionConfig; onChange: 
 // ── TemplateConfig ─────────────────────────────────────────────────────────────
 
 function TemplateConfig({ config, onChange }: { config: FunctionConfig; onChange: (p: Partial<FunctionConfig>) => void }) {
+  const t = useLang();
   return (
-    <Field label="value_template">
-      <textarea
-        value={(config.value_template as string) ?? ""}
-        onChange={(e) => onChange({ value_template: e.target.value })}
-        rows={5}
-        placeholder="{% set state = states(entity_id) %}&#10;{{ state }}"
-        style={{ ...inputStyle, fontFamily: "monospace", fontSize: 11, resize: "vertical" }}
-      />
-    </Field>
+    <>
+      <UsageHint text={t.templateUsage} />
+      <Field label="value_template">
+        <textarea
+          value={(config.value_template as string) ?? ""}
+          onChange={(e) => onChange({ value_template: e.target.value })}
+          rows={5}
+          placeholder={"{% set state = states(entity_id) %}\n{{ state }}"}
+          style={{ ...inputStyle, fontFamily: "monospace", fontSize: 11, resize: "vertical" }}
+        />
+      </Field>
+    </>
   );
 }
 
 // ── WebConfig ──────────────────────────────────────────────────────────────────
 
 function WebConfig({ config, onChange }: { config: FunctionConfig; onChange: (p: Partial<FunctionConfig>) => void }) {
+  const t = useLang();
   const headers = parseKV((config.headers ?? {}) as Record<string, unknown>);
   const updateHeaders = (entries: KVEntry[]) => onChange({ headers: buildKV(entries) });
 
   return (
     <>
-      <Field label="URL">
+      <UsageHint text={t.webUsage} />
+      <Field label={t.webUrl}>
         <input
           value={(config.url as string) ?? ""}
           onChange={(e) => onChange({ url: e.target.value })}
-          placeholder="https://example.com/api/{{ param }}"
+          placeholder="https://api.example.com/data/{{ city }}"
           style={inputStyle}
         />
       </Field>
-      <Field label="Method">
+      <Field label={t.webMethod}>
         <select value={(config.method as string) ?? "GET"} onChange={(e) => onChange({ method: e.target.value })} style={inputStyle}>
           {HTTP_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
       </Field>
       <div style={{ marginBottom: 10 }}>
-        <div style={{ color: "#94a3b8", fontSize: 11, marginBottom: 4 }}>Headers</div>
+        <div style={{ color: "#94a3b8", fontSize: 11, marginBottom: 4 }}>{t.webHeaders}</div>
         {headers.map((entry, i) => (
           <div key={i} style={{ display: "flex", gap: 4, marginBottom: 4 }}>
             <input value={entry.key} onChange={(e) => updateHeaders(headers.map((h, idx) => idx === i ? { ...h, key: e.target.value } : h))}
-              placeholder="Header-Name" style={{ ...inputStyle, flex: 1, fontSize: 11 }} />
+              placeholder="Authorization" style={{ ...inputStyle, flex: 1, fontSize: 11 }} />
             <input value={entry.value} onChange={(e) => updateHeaders(headers.map((h, idx) => idx === i ? { ...h, value: e.target.value } : h))}
-              placeholder="value" style={{ ...inputStyle, flex: 2, fontSize: 11 }} />
+              placeholder="Bearer {{ token }}" style={{ ...inputStyle, flex: 2, fontSize: 11 }} />
             <button onClick={() => updateHeaders(headers.filter((_, idx) => idx !== i))}
               style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer" }}>✕</button>
           </div>
         ))}
         <button onClick={() => updateHeaders([...headers, { key: "", value: "" }])} style={{ ...addBtnStyle, fontSize: 11, padding: "3px 8px" }}>
-          + Add Header
+          {t.addHeader}
         </button>
       </div>
     </>
@@ -355,34 +385,40 @@ function WebConfig({ config, onChange }: { config: FunctionConfig; onChange: (p:
 // ── BashConfig ─────────────────────────────────────────────────────────────────
 
 function BashConfig({ config, onChange }: { config: FunctionConfig; onChange: (p: Partial<FunctionConfig>) => void }) {
+  const t = useLang();
   return (
-    <Field label="Command">
-      <textarea
-        value={(config.command as string) ?? ""}
-        onChange={(e) => onChange({ command: e.target.value })}
-        rows={3}
-        placeholder="df -h /data"
-        style={{ ...inputStyle, fontFamily: "monospace", fontSize: 11, resize: "vertical" }}
-      />
-    </Field>
+    <>
+      <UsageHint text={t.bashUsage} />
+      <Field label="Command">
+        <textarea
+          value={(config.command as string) ?? ""}
+          onChange={(e) => onChange({ command: e.target.value })}
+          rows={3}
+          placeholder={"df -h /data\n# 또는\ncat /config/notes/{{ filename }}"}
+          style={{ ...inputStyle, fontFamily: "monospace", fontSize: 11, resize: "vertical" }}
+        />
+      </Field>
+    </>
   );
 }
 
 // ── FileConfig ─────────────────────────────────────────────────────────────────
 
 function FileConfig({ config, onChange }: { config: FunctionConfig; onChange: (p: Partial<FunctionConfig>) => void }) {
+  const t = useLang();
   return (
     <>
-      <Field label="Operation">
+      <UsageHint text={t.fileUsage} />
+      <Field label={t.fileOperation}>
         <select value={(config.operation as string) ?? "read"} onChange={(e) => onChange({ operation: e.target.value })} style={inputStyle}>
           {FILE_OPS.map((op) => <option key={op} value={op}>{op}</option>)}
         </select>
       </Field>
-      <Field label="Path">
+      <Field label={t.filePath}>
         <input
           value={(config.path as string) ?? ""}
           onChange={(e) => onChange({ path: e.target.value })}
-          placeholder="notes.txt"
+          placeholder="/config/notes/{{ filename }}.txt"
           style={inputStyle}
         />
       </Field>
@@ -393,9 +429,11 @@ function FileConfig({ config, onChange }: { config: FunctionConfig; onChange: (p
 // ── SqliteConfig ───────────────────────────────────────────────────────────────
 
 function SqliteConfig({ config, onChange }: { config: FunctionConfig; onChange: (p: Partial<FunctionConfig>) => void }) {
+  const t = useLang();
   return (
     <>
-      <Field label="DB Path">
+      <UsageHint text={t.sqliteUsage} />
+      <Field label={t.sqliteDbPath}>
         <input
           value={(config.db_path as string) ?? ""}
           onChange={(e) => onChange({ db_path: e.target.value })}
@@ -409,7 +447,7 @@ function SqliteConfig({ config, onChange }: { config: FunctionConfig; onChange: 
           checked={(config.allow_write as boolean) ?? false}
           onChange={(e) => onChange({ allow_write: e.target.checked })}
         />
-        Allow Write (INSERT / UPDATE / DELETE)
+        {t.allowWrite}
       </label>
     </>
   );
@@ -418,21 +456,26 @@ function SqliteConfig({ config, onChange }: { config: FunctionConfig; onChange: 
 // ── ScriptConfig ───────────────────────────────────────────────────────────────
 
 function ScriptConfig({ config, onChange }: { config: FunctionConfig; onChange: (p: Partial<FunctionConfig>) => void }) {
+  const t = useLang();
   return (
-    <Field label="Sequence (JSON)">
-      <textarea
-        value={JSON.stringify(config.sequence ?? [], null, 2)}
-        onChange={(e) => {
-          try {
-            onChange({ sequence: JSON.parse(e.target.value) });
-          } catch {
-            // ignore parse errors while typing
-          }
-        }}
-        rows={6}
-        style={{ ...inputStyle, fontFamily: "monospace", fontSize: 11, resize: "vertical" }}
-      />
-    </Field>
+    <>
+      <UsageHint text={t.scriptUsage} />
+      <Field label={t.sequenceJson}>
+        <textarea
+          value={JSON.stringify(config.sequence ?? [], null, 2)}
+          onChange={(e) => {
+            try {
+              onChange({ sequence: JSON.parse(e.target.value) });
+            } catch {
+              // ignore parse errors while typing
+            }
+          }}
+          rows={6}
+          placeholder={'[\n  {"service": "light.turn_on", "target": {"entity_id": "light.living_room"}},\n  {"delay": {"seconds": 1}}\n]'}
+          style={{ ...inputStyle, fontFamily: "monospace", fontSize: 11, resize: "vertical" }}
+        />
+      </Field>
+    </>
   );
 }
 
