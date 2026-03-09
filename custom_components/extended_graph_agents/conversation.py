@@ -144,6 +144,7 @@ class GraphConversationEntity(
         state = GraphState(
             user_input=user_input.text,
             conversation_id=user_input.conversation_id or "",
+            language=user_input.language or "en",
         )
 
         try:

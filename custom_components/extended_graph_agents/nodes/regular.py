@@ -36,6 +36,8 @@ class RegularNode(BaseNode):
         system_prompt = tmpl.Template(raw_prompt, hass).async_render(
             state.to_template_context(), parse_result=False
         )
+        if state.language and state.language != "en":
+            system_prompt += f"\n\nAlways respond in the user's language: {state.language}"
 
         # Build messages: include previous node outputs as context
         user_content = state.user_input

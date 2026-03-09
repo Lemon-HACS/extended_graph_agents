@@ -10,6 +10,7 @@ class GraphState:
 
     user_input: str
     conversation_id: str
+    language: str = "en"
     variables: dict[str, Any] = field(default_factory=dict)
     node_outputs: dict[str, str] = field(default_factory=dict)  # node_id -> output text
     messages: list[dict[str, Any]] = field(default_factory=list)
@@ -28,6 +29,7 @@ class GraphState:
         return {
             "state": self,
             "user_input": self.user_input,
+            "language": self.language,
             "variables": self.variables,
             "node_outputs": self.node_outputs,
         }
