@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.components.frontend import async_register_built_in_panel
+from homeassistant.components.http import StaticPathConfig
 from .const import CONF_API_KEY, CONF_BASE_URL, DEFAULT_BASE_URL, DOMAIN
 from .websocket_api import async_setup_websocket_api
 
@@ -37,10 +38,8 @@ async def async_setup_entry(
     # Register static files
     www_dir = Path(__file__).parent / "www"
     if www_dir.exists():
-        hass.http.register_static_path(
-            f"/{DOMAIN}_static",
-            str(www_dir),
-            cache_headers=False,
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(f"/{DOMAIN}_static", str(www_dir), cache_headers=False)]
         )
 
     # Register frontend panel
