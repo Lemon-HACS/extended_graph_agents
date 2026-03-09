@@ -4,6 +4,8 @@ import {
   getBezierPath,
 } from "@xyflow/react";
 import type { EdgeProps } from "@xyflow/react";
+import { useGraphStore } from "../../store/graphStore";
+import type { GraphNode } from "../../types";
 
 export function ConditionalEdge({
   id,
@@ -26,9 +28,15 @@ export function ConditionalEdge({
     targetPosition,
   });
 
+  const { flowNodes } = useGraphStore();
   const isParallel = data?.mode === "parallel";
+  const matchVal = String(data?.match ?? "");
+  const matchedNode = flowNodes.find((n) => n.id === matchVal);
+  const matchedName = matchedNode
+    ? ((matchedNode.data as unknown as GraphNode)?.name ?? matchVal)
+    : null;
   const label =
-    data?.match === "*" ? "default" : String(data?.match ?? "");
+    matchVal === "*" ? "default" : (matchedName ?? matchVal);
 
   return (
     <>

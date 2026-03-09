@@ -150,7 +150,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setIsSaving: (saving) => set({ isSaving: saving }),
 
   newGraph: () => {
-    const id = `graph_${Date.now()}`;
+    const id = crypto.randomUUID();
     const graph: GraphDefinition = {
       id,
       name: "New Graph",
@@ -192,7 +192,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
 
   addNode: (type, position) => {
-    const id = `${type}_${Date.now()}`;
+    const id = crypto.randomUUID();
     get().addLog("info", `노드 추가: type=${type}, id=${id}, pos=(${Math.round(position.x)}, ${Math.round(position.y)})`);
 
     const flowType =

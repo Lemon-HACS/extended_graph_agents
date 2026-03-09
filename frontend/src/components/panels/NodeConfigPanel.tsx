@@ -10,7 +10,7 @@ interface NodeConfigPanelProps {
 }
 
 export function NodeConfigPanel({ onClose, isMobile, panelWidth = 380 }: NodeConfigPanelProps) {
-  const { flowNodes, selectedNodeId, updateNodeData } = useGraphStore();
+  const { flowNodes, flowEdges, selectedNodeId, updateNodeData, updateNodes, updateEdges } = useGraphStore();
   const t = useLang();
   const selectedNode = flowNodes.find((n) => n.id === selectedNodeId);
 
@@ -277,15 +277,26 @@ function RouterConfig({
                 </div>
 
                 <Field label={t.matchValue}>
-                  <input
+                  <select
                     value={match}
-                    onChange={(e) =>
-                      updateEdgeData(edge.id, { match: e.target.value })
-                    }
-                    placeholder={t.matchPlaceholder}
+                    onChange={(e) => {
+                      updateEdgeData(edge.id, { match: e.target.value });
+                      selectEdge(edge.id);
+                    }}
                     style={inputStyle}
-                    onClick={() => selectEdge(edge.id)}
-                  />
+                  >
+                    <option value="*">* (default)</option>
+                    {flowNodes
+                      .filter((n) => n.id !== data.id)
+                      .map((n) => {
+                        const nodeName = (n.data as unknown as GraphNode)?.name;
+                        return (
+                          <option key={n.id} value={n.id}>
+                            {nodeName ? `${nodeName} (${n.id})` : n.id}
+                          </option>
+                        );
+                      })}
+                  </select>
                 </Field>
 
                 <Field label={t.executionMode}>
