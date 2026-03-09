@@ -25,23 +25,12 @@ export function GraphList({
   return (
     <div
       style={{
-        width: sidebarWidth,
+        width: "100%",
+        height: "100%",
         background: "#0a0f1e",
-        borderRight: "1px solid #1e293b",
         display: "flex",
         flexDirection: "column",
         flexShrink: 0,
-        ...(isMobile
-          ? {
-              position: "absolute",
-              top: 0,
-              left: 0,
-              bottom: 0,
-              width: 280,
-              zIndex: 50,
-              boxShadow: "4px 0 24px rgba(0,0,0,0.5)",
-            }
-          : {}),
       }}
     >
       <div style={{ padding: 16, borderBottom: "1px solid #1e293b" }}>

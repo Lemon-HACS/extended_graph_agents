@@ -74,47 +74,14 @@ export function SkillsPanel({ conn, isMobile, sidebarWidth, onClose }: SkillsPan
   return (
     <div
       style={{
-        width: isMobile ? "100%" : sidebarWidth,
+        width: "100%",
+        height: "100%",
         background: "#0a0f1e",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        flexShrink: 0,
-        ...(isMobile
-          ? {
-              position: "absolute",
-              top: 0,
-              left: 0,
-              bottom: 0,
-              zIndex: 50,
-            }
-          : {}),
       }}
     >
-      {/* Header */}
-      <div
-        style={{
-          padding: "12px 16px 8px",
-          borderBottom: "1px solid #1e293b",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexShrink: 0,
-        }}
-      >
-        <span style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600 }}>
-          {t.skillsTab}
-        </span>
-        {isMobile && onClose && (
-          <button
-            onClick={onClose}
-            style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 18 }}
-          >
-            ✕
-          </button>
-        )}
-      </div>
-
       {/* New Skill button */}
       <div style={{ padding: "8px 12px", flexShrink: 0 }}>
         <button
