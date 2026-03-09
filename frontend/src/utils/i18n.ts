@@ -26,6 +26,7 @@ const en = {
 
   // NodeConfigPanel
   nodeConfig: "Node Config",
+  deleteNode: "Delete Node",
   nodeId: "Node ID",
   name: "Name",
   modelOptional: "Model (optional)",
@@ -152,6 +153,7 @@ const ko: typeof en = {
 
   // NodeConfigPanel
   nodeConfig: "노드 설정",
+  deleteNode: "노드 삭제",
   nodeId: "노드 ID",
   name: "이름",
   modelOptional: "모델 (선택사항)",

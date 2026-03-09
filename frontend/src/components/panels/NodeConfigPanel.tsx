@@ -12,7 +12,7 @@ interface NodeConfigPanelProps {
 }
 
 export function NodeConfigPanel({ onClose, isMobile, panelWidth = 380 }: NodeConfigPanelProps) {
-  const { flowNodes, flowEdges, selectedNodeId, updateNodeData, updateNodes, updateEdges } = useGraphStore();
+  const { flowNodes, flowEdges, selectedNodeId, updateNodeData, updateNodes, updateEdges, deleteNode } = useGraphStore();
   const t = useLang();
   const selectedNode = flowNodes.find((n) => n.id === selectedNodeId);
 
@@ -71,19 +71,36 @@ export function NodeConfigPanel({ onClose, isMobile, panelWidth = 380 }: NodeCon
           </div>
           <div style={{ color: "white", fontWeight: 600 }}>{t.nodeConfig}</div>
         </div>
-        <button
-          onClick={onClose}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#94a3b8",
-            cursor: "pointer",
-            fontSize: 18,
-            lineHeight: 1,
-          }}
-        >
-          ✕
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            onClick={() => { deleteNode(selectedNode.id); onClose(); }}
+            style={{
+              background: "#2d1515",
+              border: "1px solid #7f1d1d",
+              color: "#f87171",
+              borderRadius: 6,
+              padding: "4px 10px",
+              cursor: "pointer",
+              fontSize: 11,
+              fontWeight: 600,
+            }}
+          >
+            🗑 {t.deleteNode}
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#94a3b8",
+              cursor: "pointer",
+              fontSize: 18,
+              lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* Scrollable content */}

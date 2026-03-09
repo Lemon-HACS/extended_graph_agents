@@ -52,6 +52,7 @@ interface GraphStore {
   newGraph: () => void;
   getCurrentGraphDef: () => GraphDefinition | null;
   addNode: (type: "input" | "router" | "regular" | "output", position: { x: number; y: number }) => void;
+  deleteNode: (nodeId: string) => void;
   updateGraphMeta: (meta: Partial<Pick<GraphDefinition, "name" | "description" | "model">>) => void;
 }
 
@@ -97,7 +98,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
 
   updateNodes: (nodes) => {
-    const { currentGraph } = get();
+    const { currentGraph, selectedNodeId } = get();
     if (currentGraph) {
       // Save positions to localStorage
       const positions: Record<string, { x: number; y: number }> = {};
@@ -109,7 +110,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         JSON.stringify(positions)
       );
     }
-    set({ flowNodes: nodes, isDirty: true });
+    // Auto-clear selection if selected node was removed
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const newSelectedNodeId = selectedNodeId && nodeIds.has(selectedNodeId) ? selectedNodeId : null;
+    set({ flowNodes: nodes, isDirty: true, selectedNodeId: newSelectedNodeId });
   },
 
   updateEdges: (edges) => set({ flowEdges: edges, isDirty: true }),
@@ -182,6 +186,16 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       flowNodes,
       flowEdges
     );
+  },
+
+  deleteNode: (nodeId) => {
+    get().addLog("warn", `노드 삭제: ${nodeId}`);
+    set((state) => ({
+      flowNodes: state.flowNodes.filter((n) => n.id !== nodeId),
+      flowEdges: state.flowEdges.filter((e) => e.source !== nodeId && e.target !== nodeId),
+      selectedNodeId: state.selectedNodeId === nodeId ? null : state.selectedNodeId,
+      isDirty: true,
+    }));
   },
 
   updateGraphMeta: (meta) => {

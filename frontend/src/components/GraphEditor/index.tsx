@@ -177,6 +177,7 @@ function GraphEditorInner({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditor
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
+        deleteKeyCode={["Delete", "Backspace"]}
         fitView
         style={{ background: "#020817", width: "100%", height: "100%" }}
         colorMode="dark"
