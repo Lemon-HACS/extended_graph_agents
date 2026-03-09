@@ -122,17 +122,17 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
-      const type = event.dataTransfer.getData("nodeType") as
-        | "router"
-        | "regular";
+      const types = Array.from(event.dataTransfer.types);
+      const type = event.dataTransfer.getData("nodeType") as "router" | "regular";
+      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      addLog(
+        type ? "info" : "warn",
+        `[drop] nodeType="${type || "(없음)"}" | dataTransfer.types=[${types.join(",")}] | screen=(${event.clientX},${event.clientY}) | flow=(${Math.round(position.x)},${Math.round(position.y)}) | target=${(event.target as HTMLElement).tagName}.${(event.target as HTMLElement).className.toString().slice(0,40)}`
+      );
       if (!type) return;
-      const position = screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
       addNode(type, position);
     },
-    [screenToFlowPosition, addNode]
+    [screenToFlowPosition, addNode, addLog]
   );
 
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -177,9 +177,19 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
 }
 
 function NodePalette() {
+  const { addLog } = useGraphStore();
+
   const onDragStart = (e: React.DragEvent, type: string) => {
     e.dataTransfer.setData("nodeType", type);
     e.dataTransfer.effectAllowed = "move";
+    addLog("info", `[dragstart] type="${type}" | effectAllowed=${e.dataTransfer.effectAllowed}`);
+  };
+
+  const onDragEnd = (e: React.DragEvent, type: string) => {
+    addLog(
+      e.dataTransfer.dropEffect === "none" ? "warn" : "info",
+      `[dragend] type="${type}" | dropEffect="${e.dataTransfer.dropEffect}" (none=드롭 실패)`
+    );
   };
 
   return (
@@ -200,6 +210,7 @@ function NodePalette() {
       <div
         draggable
         onDragStart={(e) => onDragStart(e, "router")}
+        onDragEnd={(e) => onDragEnd(e, "router")}
         style={{
           background: "#1a3050",
           border: "1px solid #3b82f6",
@@ -219,6 +230,7 @@ function NodePalette() {
       <div
         draggable
         onDragStart={(e) => onDragStart(e, "regular")}
+        onDragEnd={(e) => onDragEnd(e, "regular")}
         style={{
           background: "#162d16",
           border: "1px solid #22c55e",
