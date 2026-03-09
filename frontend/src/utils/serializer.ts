@@ -87,7 +87,6 @@ export function graphToFlow(
           target: targetId,
           type: "conditionalEdge",
           data: { match: "*", mode: "sequential" },
-          style: { strokeDasharray: "3,3", opacity: 0.7 },
         });
       });
     }

@@ -9,6 +9,7 @@ import type { GraphNode } from "../../types";
 
 export function ConditionalEdge({
   id,
+  source,
   sourceX,
   sourceY,
   targetX,
@@ -29,14 +30,38 @@ export function ConditionalEdge({
   });
 
   const { flowNodes } = useGraphStore();
+  const sourceNode = flowNodes.find((n) => n.id === source);
+
+  // Determine edge kind by source node type
+  const isRouterSource = sourceNode?.type === "routerNode";
   const isParallel = data?.mode === "parallel";
+
+  if (!isRouterSource) {
+    // Fan-in / pass-through edge (regular → regular, input → node, etc.)
+    return (
+      <>
+        <BaseEdge
+          path={edgePath}
+          markerEnd={markerEnd}
+          style={{
+            stroke: "#475569",
+            strokeWidth: 1.5,
+            strokeDasharray: "4,3",
+            opacity: 0.6,
+            ...style,
+          }}
+        />
+      </>
+    );
+  }
+
+  // Router edge: show match label and parallel indicator
   const matchVal = String(data?.match ?? "");
   const matchedNode = flowNodes.find((n) => n.id === matchVal);
   const matchedName = matchedNode
     ? ((matchedNode.data as unknown as GraphNode)?.name ?? matchVal)
     : null;
-  const label =
-    matchVal === "*" ? "default" : (matchedName ?? matchVal);
+  const label = matchVal === "*" ? "default" : (matchedName ?? matchVal);
 
   return (
     <>
