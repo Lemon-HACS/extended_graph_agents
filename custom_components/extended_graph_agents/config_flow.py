@@ -23,7 +23,7 @@ class ExtendedGraphAgentsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     @classmethod
     def async_get_options_flow(cls, config_entry):
-        return OptionsFlow(config_entry)
+        return OptionsFlow()
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         errors = {}
