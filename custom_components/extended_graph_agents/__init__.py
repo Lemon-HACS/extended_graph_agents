@@ -9,6 +9,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.components.frontend import async_register_built_in_panel
 from homeassistant.components.http import StaticPathConfig
+import json
 from .const import CONF_API_KEY, CONF_BASE_URL, DEFAULT_BASE_URL, DOMAIN
 from .websocket_api import async_setup_websocket_api
 
@@ -42,6 +43,10 @@ async def async_setup_entry(
             [StaticPathConfig(f"/{DOMAIN}_static", str(www_dir), cache_headers=False)]
         )
 
+    # Read version for cache busting
+    manifest_path = Path(__file__).parent / "manifest.json"
+    version = json.loads(manifest_path.read_text())["version"]
+
     # Register frontend panel
     try:
         async_register_built_in_panel(
@@ -53,7 +58,7 @@ async def async_setup_entry(
             config={
                 "_panel_custom": {
                     "name": "extended-graph-agents-panel",
-                    "js_url": f"/{DOMAIN}_static/panel.js",
+                    "js_url": f"/{DOMAIN}_static/panel.js?v={version}",
                     "embed_iframe": False,
                     "trust_external": False,
                 }
