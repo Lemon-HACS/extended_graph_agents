@@ -3,6 +3,20 @@ import type { Node, Edge } from "@xyflow/react";
 import type { GraphDefinition, GraphSummary } from "../types";
 import { graphToFlow, flowToGraph } from "../utils/serializer";
 
+export interface LogEntry {
+  id: number;
+  time: string;
+  level: "info" | "warn" | "error";
+  message: string;
+}
+
+let _logSeq = 0;
+function makeLog(level: LogEntry["level"], message: string): LogEntry {
+  const now = new Date();
+  const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}.${String(now.getMilliseconds()).padStart(3, "0")}`;
+  return { id: _logSeq++, time, level, message };
+}
+
 interface GraphStore {
   // Graph list
   graphList: GraphSummary[];
@@ -19,6 +33,11 @@ interface GraphStore {
   // UI state
   isDirty: boolean;
   isSaving: boolean;
+
+  // Debug logs
+  logs: LogEntry[];
+  addLog: (level: LogEntry["level"], message: string) => void;
+  clearLogs: () => void;
 
   // Actions
   loadGraph: (graph: GraphDefinition) => void;
@@ -44,6 +63,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   isDirty: false,
   isSaving: false,
 
+  logs: [makeLog("info", "디버그 패널 초기화")],
+  addLog: (level, message) =>
+    set((state) => ({ logs: [...state.logs, makeLog(level, message)] })),
+  clearLogs: () => set({ logs: [] }),
+
   loadGraph: (graph) => {
     // Restore saved positions from localStorage
     const savedPositions = (() => {
@@ -57,6 +81,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     })();
 
     const { nodes, edges } = graphToFlow(graph, savedPositions);
+    get().addLog("info", `그래프 로드: "${graph.name}" (id=${graph.id}, 노드=${nodes.length}, 엣지=${edges.length})`);
     set({
       currentGraph: graph,
       flowNodes: nodes,
@@ -93,7 +118,13 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     }));
   },
 
-  selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
+  selectNode: (nodeId) => {
+    if (nodeId) {
+      const node = get().flowNodes.find((n) => n.id === nodeId);
+      get().addLog("info", `노드 선택: ${nodeId} (type=${node?.type ?? "unknown"})`);
+    }
+    set({ selectedNodeId: nodeId });
+  },
 
   setIsSaving: (saving) => set({ isSaving: saving }),
 
@@ -107,6 +138,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       nodes: [],
     };
     const { nodes, edges } = graphToFlow(graph);
+    get().addLog("info", `새 그래프 생성: id=${id}`);
     set({
       currentGraph: graph,
       flowNodes: nodes,
@@ -140,6 +172,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
 
   addNode: (type, position) => {
     const id = `${type}_${Date.now()}`;
+    get().addLog("info", `노드 추가: type=${type}, id=${id}, pos=(${Math.round(position.x)}, ${Math.round(position.y)})`);
     const newNode: Node = {
       id,
       type: type === "router" ? "routerNode" : "regularNode",

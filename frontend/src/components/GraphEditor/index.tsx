@@ -85,6 +85,7 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
     updateNodes,
     updateEdges,
     addNode,
+    addLog,
   } = useGraphStore();
 
   const { screenToFlowPosition } = useReactFlow();
@@ -111,10 +112,11 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
         data: { match: "*", mode: "sequential" },
         id: `${params.source}->${params.target}-${Date.now()}`,
       };
+      addLog("info", `엣지 연결: ${params.source} → ${params.target}`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       updateEdges(addEdge(edge as any, flowEdges));
     },
-    [flowEdges, updateEdges]
+    [flowEdges, updateEdges, addLog]
   );
 
   const onDrop = useCallback(
