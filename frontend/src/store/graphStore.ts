@@ -27,8 +27,9 @@ interface GraphStore {
   flowNodes: Node[];
   flowEdges: Edge[];
 
-  // Selected node for config panel
+  // Selected node/edge for config panel
   selectedNodeId: string | null;
+  selectedEdgeId: string | null;
 
   // UI state
   isDirty: boolean;
@@ -44,7 +45,9 @@ interface GraphStore {
   updateNodes: (nodes: Node[]) => void;
   updateEdges: (edges: Edge[]) => void;
   updateNodeData: (nodeId: string, data: Partial<Record<string, unknown>>) => void;
+  updateEdgeData: (edgeId: string, data: Partial<Record<string, unknown>>) => void;
   selectNode: (nodeId: string | null) => void;
+  selectEdge: (edgeId: string | null) => void;
   setIsSaving: (saving: boolean) => void;
   newGraph: () => void;
   getCurrentGraphDef: () => GraphDefinition | null;
@@ -60,6 +63,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   flowNodes: [],
   flowEdges: [],
   selectedNodeId: null,
+  selectedEdgeId: null,
   isDirty: false,
   isSaving: false,
 
@@ -88,6 +92,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       flowEdges: edges,
       isDirty: false,
       selectedNodeId: null,
+      selectedEdgeId: null,
     });
   },
 
@@ -118,12 +123,28 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     }));
   },
 
+  updateEdgeData: (edgeId, data) => {
+    set((state) => ({
+      flowEdges: state.flowEdges.map((e) =>
+        e.id === edgeId ? { ...e, data: { ...e.data, ...data } } : e
+      ),
+      isDirty: true,
+    }));
+  },
+
   selectNode: (nodeId) => {
     if (nodeId) {
       const node = get().flowNodes.find((n) => n.id === nodeId);
       get().addLog("info", `노드 선택: ${nodeId} (type=${node?.type ?? "unknown"})`);
     }
-    set({ selectedNodeId: nodeId });
+    set({ selectedNodeId: nodeId, selectedEdgeId: null });
+  },
+
+  selectEdge: (edgeId) => {
+    if (edgeId) {
+      get().addLog("info", `엣지 선택: ${edgeId}`);
+    }
+    set({ selectedEdgeId: edgeId, selectedNodeId: null });
   },
 
   setIsSaving: (saving) => set({ isSaving: saving }),

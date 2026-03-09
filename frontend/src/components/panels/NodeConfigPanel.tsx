@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useGraphStore } from "../../store/graphStore";
 import { useLang } from "../../contexts/LangContext";
-import type { GraphNode, FunctionTool, RouteConfig } from "../../types";
+import type { GraphNode, FunctionTool } from "../../types";
 
 interface NodeConfigPanelProps {
   onClose: () => void;
@@ -165,25 +165,10 @@ function RouterConfig({
   update: (f: string, v: unknown) => void;
 }) {
   const t = useLang();
-  const routes = data.routes ?? [];
+  const { flowEdges, flowNodes, updateEdgeData, updateEdges, selectEdge } = useGraphStore();
 
-  const addRoute = () => {
-    update("routes", [
-      ...routes,
-      { match: "", next: [], mode: "sequential" },
-    ]);
-  };
-
-  const updateRoute = (i: number, field: keyof RouteConfig, value: unknown) => {
-    const newRoutes = routes.map((r, idx) =>
-      idx === i ? { ...r, [field]: value } : r
-    );
-    update("routes", newRoutes);
-  };
-
-  const removeRoute = (i: number) => {
-    update("routes", routes.filter((_, idx) => idx !== i));
-  };
+  // 이 라우터에서 나가는 엣지들만 필터
+  const routerEdges = flowEdges.filter((e) => e.source === data.id);
 
   return (
     <div>
@@ -206,78 +191,130 @@ function RouterConfig({
         >
           {t.routes}
         </div>
-        {routes.map((route, i) => (
+
+        {routerEdges.length === 0 ? (
           <div
-            key={i}
             style={{
-              background: "#1e293b",
-              borderRadius: 8,
               padding: 12,
+              background: "rgba(255,255,255,0.03)",
+              borderRadius: 8,
+              color: "#475569",
+              fontSize: 12,
+              lineHeight: 1.6,
               marginBottom: 8,
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 8,
-              }}
-            >
-              <span style={{ color: "#94a3b8", fontSize: 11 }}>
-                {t.route} {i + 1}
-              </span>
-              <button
-                onClick={() => removeRoute(i)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#ef4444",
-                  cursor: "pointer",
-                  fontSize: 14,
-                }}
-              >
-                ✕
-              </button>
-            </div>
-            <Field label={t.matchValue}>
-              <input
-                value={route.match}
-                onChange={(e) => updateRoute(i, "match", e.target.value)}
-                placeholder={t.matchPlaceholder}
-                style={inputStyle}
-              />
-            </Field>
-            <Field label={t.nextNodeIds}>
-              <input
-                value={(route.next ?? []).join(", ")}
-                onChange={(e) =>
-                  updateRoute(
-                    i,
-                    "next",
-                    e.target.value
-                      .split(",")
-                      .map((s) => s.trim())
-                      .filter(Boolean)
-                  )
-                }
-                style={inputStyle}
-              />
-            </Field>
-            <Field label={t.executionMode}>
-              <select
-                value={route.mode ?? "sequential"}
-                onChange={(e) => updateRoute(i, "mode", e.target.value)}
-                style={inputStyle}
-              >
-                <option value="sequential">{t.sequential}</option>
-                <option value="parallel">{t.parallel}</option>
-              </select>
-            </Field>
+            {t.connectInCanvas}
           </div>
-        ))}
-        <button onClick={addRoute} style={addBtnStyle}>
-          {t.addRoute}
-        </button>
+        ) : (
+          routerEdges.map((edge) => {
+            const targetNode = flowNodes.find((n) => n.id === edge.target);
+            const targetName =
+              ((targetNode?.data as unknown as GraphNode)?.name) || edge.target;
+            const match = (edge.data?.match as string) ?? "*";
+            const mode = (edge.data?.mode as string) ?? "sequential";
+
+            return (
+              <div
+                key={edge.id}
+                style={{
+                  background: "#1e293b",
+                  borderRadius: 8,
+                  padding: 12,
+                  marginBottom: 8,
+                  cursor: "pointer",
+                  border: "1px solid transparent",
+                  transition: "border-color 0.15s",
+                }}
+                onMouseEnter={(e) =>
+                  ((e.currentTarget as HTMLDivElement).style.borderColor = "#334155")
+                }
+                onMouseLeave={(e) =>
+                  ((e.currentTarget as HTMLDivElement).style.borderColor = "transparent")
+                }
+              >
+                {/* Header: target node name + delete */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 8,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ color: "#64748b", fontSize: 11 }}>→</span>
+                    <span
+                      style={{
+                        background: "#162d16",
+                        border: "1px solid #22c55e",
+                        borderRadius: 4,
+                        padding: "1px 7px",
+                        fontSize: 11,
+                        color: "#86efac",
+                      }}
+                    >
+                      {targetName}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      updateEdges(flowEdges.filter((e) => e.id !== edge.id));
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#ef4444",
+                      cursor: "pointer",
+                      fontSize: 14,
+                      lineHeight: 1,
+                      padding: 2,
+                    }}
+                    title="엣지 삭제"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <Field label={t.matchValue}>
+                  <input
+                    value={match}
+                    onChange={(e) =>
+                      updateEdgeData(edge.id, { match: e.target.value })
+                    }
+                    placeholder={t.matchPlaceholder}
+                    style={inputStyle}
+                    onClick={() => selectEdge(edge.id)}
+                  />
+                </Field>
+
+                <Field label={t.executionMode}>
+                  <select
+                    value={mode}
+                    onChange={(e) =>
+                      updateEdgeData(edge.id, { mode: e.target.value })
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="sequential">{t.sequential}</option>
+                    <option value="parallel">{t.parallel}</option>
+                  </select>
+                </Field>
+              </div>
+            );
+          })
+        )}
+
+        <div
+          style={{
+            color: "#334155",
+            fontSize: 11,
+            marginTop: 4,
+            textAlign: "center",
+          }}
+        >
+          {t.connectInCanvas}
+        </div>
       </div>
     </div>
   );

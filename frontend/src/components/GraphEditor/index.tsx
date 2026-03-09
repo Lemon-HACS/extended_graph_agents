@@ -13,7 +13,7 @@ import {
   Panel,
   useReactFlow,
 } from "@xyflow/react";
-import type { Connection, NodeChange, EdgeChange } from "@xyflow/react";
+import type { Connection, NodeChange, EdgeChange, EdgeMouseHandler } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { RouterNode } from "../nodes/RouterNode";
 import { RegularNode } from "../nodes/RegularNode";
@@ -44,9 +44,11 @@ let _draggedNodeType: "input" | "router" | "regular" | "output" | null = null;
 
 interface GraphEditorProps {
   onNodeClick: (nodeId: string) => void;
+  onEdgeClick?: (edgeId: string) => void;
+  onPaneClick?: () => void;
 }
 
-export function GraphEditor({ onNodeClick }: GraphEditorProps) {
+export function GraphEditor({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditorProps) {
   const { currentGraph } = useGraphStore();
   const t = useLang();
 
@@ -83,12 +85,12 @@ export function GraphEditor({ onNodeClick }: GraphEditorProps) {
 
   return (
     <ReactFlowProvider>
-      <GraphEditorInner onNodeClick={onNodeClick} />
+      <GraphEditorInner onNodeClick={onNodeClick} onEdgeClick={onEdgeClick} onPaneClick={onPaneClick} />
     </ReactFlowProvider>
   );
 }
 
-function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
+function GraphEditorInner({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditorProps) {
   const {
     flowNodes,
     flowEdges,
@@ -112,6 +114,13 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
       updateEdges(applyEdgeChanges(changes, flowEdges));
     },
     [flowEdges, updateEdges]
+  );
+
+  const onEdgeClickHandler = useCallback<EdgeMouseHandler>(
+    (_, edge) => {
+      onEdgeClick?.(edge.id);
+    },
+    [onEdgeClick]
   );
 
   const onConnect = useCallback(
@@ -163,6 +172,8 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
         onDrop={onDrop}
         onDragOver={onDragOver}
         onNodeClick={(_, node) => onNodeClick(node.id)}
+        onEdgeClick={onEdgeClickHandler}
+        onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}

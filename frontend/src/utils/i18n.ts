@@ -50,6 +50,13 @@ const en = {
   functionType: "Function Type",
   functionConfig: "Function Config (JSON)",
 
+  // EdgeConfigPanel
+  edgeConfig: "Edge Config",
+  edgeFrom: "From",
+  edgeTo: "To",
+  deleteEdge: "Delete Edge",
+  connectInCanvas: "Draw connections in the canvas to add routes",
+
   // Dialogs
   confirmDelete: (id: string) => `Delete graph "${id}"?`,
   failedToSave: (err: string) => `Failed to save graph: ${err}`,
@@ -106,6 +113,13 @@ const ko: typeof en = {
   description: "설명",
   functionType: "함수 유형",
   functionConfig: "함수 설정 (JSON)",
+
+  // EdgeConfigPanel
+  edgeConfig: "엣지 설정",
+  edgeFrom: "출발",
+  edgeTo: "도착",
+  deleteEdge: "엣지 삭제",
+  connectInCanvas: "캔버스에서 노드를 연결하여 라우트를 추가하세요",
 
   // Dialogs
   confirmDelete: (id: string) => `"${id}" 그래프를 삭제하시겠습니까?`,

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { GraphList } from "./components/panels/GraphList";
 import { GraphEditor } from "./components/GraphEditor";
 import { NodeConfigPanel } from "./components/panels/NodeConfigPanel";
+import { EdgeConfigPanel } from "./components/panels/EdgeConfigPanel";
 import { DebugPanel } from "./components/panels/DebugPanel";
 import { useGraphStore } from "./store/graphStore";
 import { listGraphs, getGraph, saveGraph, deleteGraph } from "./utils/haApi";
@@ -31,7 +32,9 @@ export function App({ hass }: AppProps) {
     newGraph,
     currentGraph,
     selectedNodeId,
+    selectedEdgeId,
     selectNode,
+    selectEdge,
     isDirty,
     isSaving,
     setIsSaving,
@@ -260,15 +263,30 @@ export function App({ hass }: AppProps) {
             </div>
           ) : (
             <GraphEditor
-              onNodeClick={(id) =>
-                selectNode(id === selectedNodeId ? null : id)
-              }
+              onNodeClick={(id) => {
+                selectNode(id === selectedNodeId ? null : id);
+              }}
+              onEdgeClick={(id) => {
+                selectEdge(id === selectedEdgeId ? null : id);
+              }}
+              onPaneClick={() => {
+                selectNode(null);
+                selectEdge(null);
+              }}
             />
           )}
 
           {selectedNodeId && !showYaml && (
             <NodeConfigPanel
               onClose={() => selectNode(null)}
+              isMobile={isMobile}
+              panelWidth={panelWidth}
+            />
+          )}
+
+          {selectedEdgeId && !showYaml && !selectedNodeId && (
+            <EdgeConfigPanel
+              onClose={() => selectEdge(null)}
               isMobile={isMobile}
               panelWidth={panelWidth}
             />
