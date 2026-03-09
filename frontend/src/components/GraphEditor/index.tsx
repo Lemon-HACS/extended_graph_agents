@@ -141,7 +141,11 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
   }, []);
 
   return (
-    <div style={{ flex: 1, position: "relative" }}>
+    <div
+      style={{ flex: 1, position: "relative", height: "100%", minHeight: 0 }}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
+    >
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
@@ -152,10 +156,8 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
-        onDrop={onDrop}
-        onDragOver={onDragOver}
         fitView
-        style={{ background: "#020817" }}
+        style={{ background: "#020817", width: "100%", height: "100%" }}
         colorMode="dark"
       >
         <Controls style={{ background: "#0f172a", border: "1px solid #1e293b" }} />
@@ -194,6 +196,7 @@ function NodePalette() {
 
   return (
     <div
+      className="nodrag nopan"
       style={{
         background: "#0f172a",
         border: "1px solid #1e293b",

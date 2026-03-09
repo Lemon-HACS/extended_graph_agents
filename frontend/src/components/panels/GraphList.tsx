@@ -5,31 +5,77 @@ interface GraphListProps {
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
+  isMobile?: boolean;
+  onClose?: () => void;
+  sidebarWidth?: number;
 }
 
-export function GraphList({ onSelect, onNew, onDelete }: GraphListProps) {
+export function GraphList({
+  onSelect,
+  onNew,
+  onDelete,
+  isMobile,
+  onClose,
+  sidebarWidth = 240,
+}: GraphListProps) {
   const { graphList, currentGraph } = useGraphStore();
 
   return (
     <div
       style={{
-        width: 240,
+        width: sidebarWidth,
         background: "#0a0f1e",
         borderRight: "1px solid #1e293b",
         display: "flex",
         flexDirection: "column",
+        flexShrink: 0,
+        ...(isMobile
+          ? {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: 280,
+              zIndex: 50,
+              boxShadow: "4px 0 24px rgba(0,0,0,0.5)",
+            }
+          : {}),
       }}
     >
       <div style={{ padding: 16, borderBottom: "1px solid #1e293b" }}>
         <div
           style={{
-            color: "white",
-            fontWeight: 700,
-            fontSize: 15,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
             marginBottom: 12,
           }}
         >
-          Graph Agents
+          <div
+            style={{
+              color: "white",
+              fontWeight: 700,
+              fontSize: 15,
+            }}
+          >
+            Graph Agents
+          </div>
+          {isMobile && onClose && (
+            <button
+              onClick={onClose}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#94a3b8",
+                cursor: "pointer",
+                fontSize: 20,
+                lineHeight: 1,
+                padding: 0,
+              }}
+            >
+              ✕
+            </button>
+          )}
         </div>
         <button
           onClick={onNew}
@@ -69,7 +115,10 @@ export function GraphList({ onSelect, onNew, onDelete }: GraphListProps) {
             key={g.id}
             graph={g}
             isActive={currentGraph?.id === g.id}
-            onSelect={() => onSelect(g.id)}
+            onSelect={() => {
+              onSelect(g.id);
+              if (isMobile && onClose) onClose();
+            }}
             onDelete={() => onDelete(g.id)}
           />
         ))}

@@ -13,7 +13,7 @@ const LEVEL_PREFIX: Record<string, string> = {
   error: "[ERR ]",
 };
 
-export function DebugPanel() {
+export function DebugPanel({ isMobile, panelWidth = 380 }: { isMobile?: boolean; panelWidth?: number }) {
   const { logs, clearLogs } = useGraphStore();
   const [copied, setCopied] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -36,12 +36,26 @@ export function DebugPanel() {
   return (
     <div
       style={{
-        width: 380,
-        borderLeft: "1px solid #1e293b",
+        width: isMobile ? "100%" : panelWidth,
+        borderLeft: isMobile ? "none" : "1px solid #1e293b",
+        borderTop: isMobile ? "1px solid #1e293b" : "none",
         background: "#0a0f1e",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
+        flexShrink: 0,
+        ...(isMobile
+          ? {
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: "50vh",
+              zIndex: 29,
+              borderRadius: "16px 16px 0 0",
+              boxShadow: "0 -4px 24px rgba(0,0,0,0.5)",
+            }
+          : {}),
       }}
     >
       {/* Header */}

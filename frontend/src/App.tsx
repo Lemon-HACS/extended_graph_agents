@@ -7,6 +7,7 @@ import { useGraphStore } from "./store/graphStore";
 import { listGraphs, getGraph, saveGraph, deleteGraph } from "./utils/haApi";
 import type { HassConnection } from "./utils/haApi";
 import { graphToYaml } from "./utils/serializer";
+import { useWindowSize } from "./hooks/useWindowSize";
 
 interface AppProps {
   hass: {
@@ -18,6 +19,7 @@ interface AppProps {
 export function App({ hass }: AppProps) {
   const [showYaml, setShowYaml] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const {
     graphList,
     setGraphList,
@@ -32,6 +34,15 @@ export function App({ hass }: AppProps) {
     getCurrentGraphDef,
     addLog,
   } = useGraphStore();
+
+  const { isMobile, isTablet } = useWindowSize();
+  const sidebarWidth = isMobile ? 0 : isTablet ? 200 : 240;
+  const panelWidth = isMobile ? 0 : isTablet ? 300 : 380;
+
+  // 데스크탑으로 전환 시 사이드바 자동 표시
+  useEffect(() => {
+    if (!isMobile) setShowSidebar(false);
+  }, [isMobile]);
 
   const conn = hass.connection;
 
@@ -118,14 +129,33 @@ export function App({ hass }: AppProps) {
         fontFamily:
           "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         overflow: "hidden",
+        position: "relative",
       }}
     >
+      {/* Mobile sidebar backdrop */}
+      {isMobile && showSidebar && (
+        <div
+          onClick={() => setShowSidebar(false)}
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 40,
+          }}
+        />
+      )}
+
       {/* Sidebar */}
-      <GraphList
-        onSelect={handleSelectGraph}
-        onNew={handleNew}
-        onDelete={handleDelete}
-      />
+      {(!isMobile || showSidebar) && (
+        <GraphList
+          onSelect={handleSelectGraph}
+          onNew={handleNew}
+          onDelete={handleDelete}
+          isMobile={isMobile}
+          onClose={() => setShowSidebar(false)}
+          sidebarWidth={sidebarWidth}
+        />
+      )}
 
       {/* Main area */}
       <div
@@ -136,14 +166,37 @@ export function App({ hass }: AppProps) {
           style={{
             display: "flex",
             alignItems: "center",
-            padding: "8px 16px",
+            padding: isMobile ? "6px 10px" : "8px 16px",
             borderBottom: "1px solid #1e293b",
             background: "#0a0f1e",
-            gap: 12,
+            gap: isMobile ? 8 : 12,
             flexShrink: 0,
           }}
         >
-          {currentGraph ? <GraphMetaEditor /> : <div style={{ flex: 1 }} />}
+          {/* Hamburger (mobile only) */}
+          {isMobile && (
+            <button
+              onClick={() => setShowSidebar(true)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#94a3b8",
+                cursor: "pointer",
+                fontSize: 20,
+                lineHeight: 1,
+                padding: "4px",
+                flexShrink: 0,
+              }}
+            >
+              ☰
+            </button>
+          )}
+
+          {currentGraph ? (
+            <GraphMetaEditor isMobile={isMobile} />
+          ) : (
+            <div style={{ flex: 1 }} />
+          )}
 
           <div style={{ flex: 1 }} />
 
@@ -151,20 +204,20 @@ export function App({ hass }: AppProps) {
             <>
               <button
                 onClick={() => setShowYaml(!showYaml)}
-                style={secondaryBtnStyle}
+                style={secondaryBtnStyle(isMobile)}
               >
-                {showYaml ? "← Graph" : "YAML →"}
+                {showYaml ? "← Graph" : "YAML"}
               </button>
 
               <button
                 onClick={handleSave}
                 disabled={isSaving || !isDirty}
                 style={{
-                  ...primaryBtnStyle,
+                  ...primaryBtnStyle(isMobile),
                   opacity: isSaving || !isDirty ? 0.5 : 1,
                 }}
               >
-                {isSaving ? "Saving..." : isDirty ? "Save*" : "Saved"}
+                {isSaving ? "..." : isDirty ? "Save*" : "Saved"}
               </button>
             </>
           )}
@@ -172,17 +225,17 @@ export function App({ hass }: AppProps) {
           <button
             onClick={() => setShowDebug(!showDebug)}
             style={{
-              ...secondaryBtnStyle,
+              ...secondaryBtnStyle(isMobile),
               color: showDebug ? "#60a5fa" : "#64748b",
               borderColor: showDebug ? "#3b82f6" : "#334155",
             }}
           >
-            DEBUG
+            {isMobile ? "🐛" : "DEBUG"}
           </button>
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative", minHeight: 0 }}>
           {showYaml ? (
             <div style={{ flex: 1, padding: 16, overflow: "auto" }}>
               <pre
@@ -209,23 +262,31 @@ export function App({ hass }: AppProps) {
           )}
 
           {selectedNodeId && !showYaml && (
-            <NodeConfigPanel onClose={() => selectNode(null)} />
+            <NodeConfigPanel
+              onClose={() => selectNode(null)}
+              isMobile={isMobile}
+              panelWidth={panelWidth}
+            />
           )}
 
-          {showDebug && <DebugPanel />}
+          {showDebug && (
+            <DebugPanel isMobile={isMobile} panelWidth={panelWidth} />
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function GraphMetaEditor() {
+function GraphMetaEditor({ isMobile }: { isMobile?: boolean }) {
   const { currentGraph, updateGraphMeta } = useGraphStore();
   if (!currentGraph) return null;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <span style={{ color: "#94a3b8", fontSize: 13 }}>Graph:</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: isMobile ? 1 : undefined }}>
+      {!isMobile && (
+        <span style={{ color: "#94a3b8", fontSize: 13, flexShrink: 0 }}>Graph:</span>
+      )}
       <input
         value={currentGraph.name}
         onChange={(e) => updateGraphMeta({ name: e.target.value })}
@@ -233,34 +294,42 @@ function GraphMetaEditor() {
           background: "transparent",
           border: "none",
           color: "white",
-          fontSize: 15,
+          fontSize: isMobile ? 14 : 15,
           fontWeight: 600,
           outline: "none",
           padding: "4px 0",
+          minWidth: 0,
+          width: isMobile ? "100%" : undefined,
         }}
       />
-      <span style={{ color: "#334155", fontSize: 12 }}>({currentGraph.id})</span>
+      {!isMobile && (
+        <span style={{ color: "#334155", fontSize: 12, flexShrink: 0 }}>
+          ({currentGraph.id})
+        </span>
+      )}
     </div>
   );
 }
 
-const primaryBtnStyle: React.CSSProperties = {
+const primaryBtnStyle = (isMobile?: boolean): React.CSSProperties => ({
   background: "#1e3a5f",
   border: "1px solid #3b82f6",
   color: "#60a5fa",
   borderRadius: 6,
-  padding: "7px 16px",
+  padding: isMobile ? "6px 10px" : "7px 16px",
   cursor: "pointer",
-  fontSize: 13,
+  fontSize: isMobile ? 12 : 13,
   fontWeight: 600,
-};
+  flexShrink: 0,
+});
 
-const secondaryBtnStyle: React.CSSProperties = {
+const secondaryBtnStyle = (isMobile?: boolean): React.CSSProperties => ({
   background: "#1e293b",
   border: "1px solid #334155",
   color: "#94a3b8",
   borderRadius: 6,
-  padding: "7px 16px",
+  padding: isMobile ? "6px 10px" : "7px 16px",
   cursor: "pointer",
-  fontSize: 13,
-};
+  fontSize: isMobile ? 12 : 13,
+  flexShrink: 0,
+});

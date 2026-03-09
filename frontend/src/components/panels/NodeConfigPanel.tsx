@@ -4,9 +4,11 @@ import type { GraphNode, FunctionTool, RouteConfig } from "../../types";
 
 interface NodeConfigPanelProps {
   onClose: () => void;
+  isMobile?: boolean;
+  panelWidth?: number;
 }
 
-export function NodeConfigPanel({ onClose }: NodeConfigPanelProps) {
+export function NodeConfigPanel({ onClose, isMobile, panelWidth = 380 }: NodeConfigPanelProps) {
   const { flowNodes, selectedNodeId, updateNodeData } = useGraphStore();
   const selectedNode = flowNodes.find((n) => n.id === selectedNodeId);
 
@@ -24,12 +26,26 @@ export function NodeConfigPanel({ onClose }: NodeConfigPanelProps) {
   return (
     <div
       style={{
-        width: 380,
+        width: isMobile ? "100%" : panelWidth,
         background: "#0f172a",
-        borderLeft: "1px solid #1e293b",
+        borderLeft: isMobile ? "none" : "1px solid #1e293b",
+        borderTop: isMobile ? "1px solid #1e293b" : "none",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
+        flexShrink: 0,
+        ...(isMobile
+          ? {
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: "60vh",
+              zIndex: 30,
+              borderRadius: "16px 16px 0 0",
+              boxShadow: "0 -4px 24px rgba(0,0,0,0.5)",
+            }
+          : {}),
       }}
     >
       {/* Header */}
