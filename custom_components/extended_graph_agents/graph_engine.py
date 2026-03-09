@@ -67,6 +67,17 @@ class GraphEngine:
                 results = await self._execute_parallel(
                     graph, node_ids, state, exposed_entities, llm_context
                 )
+                # Fan-in: deduplicate next nodes across all parallel branches.
+                # If multiple branches point to the same node, it runs once (join/barrier).
+                seen_next: set[str] = set()
+                fan_in_next: list[str] = []
+                for result in results:
+                    for nid in result.next_node_ids:
+                        if nid not in seen_next:
+                            seen_next.add(nid)
+                            fan_in_next.append(nid)
+                if fan_in_next:
+                    pending.append((fan_in_next, "sequential"))
             else:
                 results = []
                 for node_id in node_ids:
@@ -74,11 +85,8 @@ class GraphEngine:
                         graph, node_id, state, exposed_entities, llm_context
                     )
                     results.append(result)
-
-            # Collect next nodes
-            for result in results:
-                if result.next_node_ids:
-                    pending.append((result.next_node_ids, result.execution_mode))
+                    if result.next_node_ids:
+                        pending.append((result.next_node_ids, result.execution_mode))
 
         # Determine final output
         return self._collect_final_output(graph, state)

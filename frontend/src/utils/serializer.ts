@@ -78,6 +78,20 @@ export function graphToFlow(
       });
     }
 
+    // Regular node → next nodes (fan-in join edges)
+    if (node.type === "regular" && node.next && node.next.length > 0) {
+      node.next.forEach((targetId, idx) => {
+        flowEdges.push({
+          id: `${node.id}->${targetId}-rn${idx}`,
+          source: node.id,
+          target: targetId,
+          type: "conditionalEdge",
+          data: { match: "*", mode: "sequential" },
+          style: { strokeDasharray: "3,3", opacity: 0.7 },
+        });
+      });
+    }
+
     // Output node ← input_from nodes
     if (node.type === "output" && node.input_from) {
       node.input_from.forEach((sourceId, idx) => {
@@ -156,6 +170,18 @@ export function flowToGraph(
         const targetNode = flowNodes.find((fn) => fn.id === targetId);
         return targetNode?.type !== "outputNode";
       });
+    } else if (nodeData.type === "regular") {
+      // Save outgoing edges as `next` for fan-in join support
+      const targets = outgoingEdges[n.id] ?? [];
+      const nextIds = targets.filter((targetId) => {
+        const targetNode = flowNodes.find((fn) => fn.id === targetId);
+        return targetNode?.type !== "outputNode";
+      });
+      if (nextIds.length > 0) {
+        nodeData.next = nextIds;
+      } else {
+        delete nodeData.next;
+      }
     } else if (nodeData.type === "output") {
       // Save incoming edges as `input_from`
       nodeData.input_from = incomingEdges[n.id] ?? [];
