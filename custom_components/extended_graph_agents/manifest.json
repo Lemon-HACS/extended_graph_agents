@@ -1,7 +1,7 @@
 {
   "domain": "extended_graph_agents",
   "name": "Extended Graph Agents",
-  "version": "1.0.25",
+  "version": "1.0.26",
   "requirements": ["openai>=1.0.0", "pyyaml>=6.0"],
   "dependencies": [],
   "codeowners": ["@LemonDouble"],
