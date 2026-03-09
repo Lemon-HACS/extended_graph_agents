@@ -1,4 +1,5 @@
 import { useCallback, useRef, useEffect } from "react";
+import { useLang } from "../../contexts/LangContext";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -43,6 +44,7 @@ interface GraphEditorProps {
 
 export function GraphEditor({ onNodeClick }: GraphEditorProps) {
   const { currentGraph } = useGraphStore();
+  const t = useLang();
 
   if (!currentGraph) {
     return (
@@ -65,10 +67,10 @@ export function GraphEditor({ onNodeClick }: GraphEditorProps) {
               marginBottom: 8,
             }}
           >
-            No graph selected
+            {t.noGraphSelected}
           </div>
           <div style={{ fontSize: 14 }}>
-            Select a graph from the sidebar or create a new one
+            {t.selectOrCreate}
           </div>
         </div>
       </div>
@@ -184,6 +186,7 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
 
 function NodePalette() {
   const { addLog } = useGraphStore();
+  const t = useLang();
   const routerRef = useRef<HTMLDivElement>(null);
   const agentRef = useRef<HTMLDivElement>(null);
 
@@ -255,13 +258,13 @@ function NodePalette() {
       }}
     >
       <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>
-        DRAG TO ADD
+        {t.dragToAdd}
       </div>
       <div ref={routerRef} draggable style={paletteItemStyle("#1a3050", "#3b82f6")}>
-        🔀 Router
+        🔀 {t.router}
       </div>
       <div ref={agentRef} draggable style={paletteItemStyle("#162d16", "#22c55e")}>
-        🤖 Agent
+        🤖 {t.agent}
       </div>
     </div>
   );

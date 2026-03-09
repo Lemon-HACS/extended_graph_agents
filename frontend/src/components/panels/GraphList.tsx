@@ -1,4 +1,5 @@
 import { useGraphStore } from "../../store/graphStore";
+import { useLang } from "../../contexts/LangContext";
 import type { GraphSummary } from "../../types";
 
 interface GraphListProps {
@@ -19,6 +20,7 @@ export function GraphList({
   sidebarWidth = 240,
 }: GraphListProps) {
   const { graphList, currentGraph } = useGraphStore();
+  const t = useLang();
 
   return (
     <div
@@ -58,7 +60,7 @@ export function GraphList({
               fontSize: 15,
             }}
           >
-            Graph Agents
+            {t.graphAgents}
           </div>
           {isMobile && onClose && (
             <button
@@ -91,7 +93,7 @@ export function GraphList({
             fontWeight: 600,
           }}
         >
-          + New Graph
+          {t.newGraph}
         </button>
       </div>
 
@@ -105,9 +107,9 @@ export function GraphList({
               textAlign: "center",
             }}
           >
-            No graphs yet.
+            {t.noGraphsYet}
             <br />
-            Create one to start.
+            {t.createOneToStart}
           </div>
         )}
         {graphList.map((g) => (
@@ -138,6 +140,8 @@ function GraphItem({
   onSelect: () => void;
   onDelete: () => void;
 }) {
+  const t = useLang();
+
   return (
     <div
       onClick={onSelect}
@@ -170,7 +174,7 @@ function GraphItem({
             {graph.name}
           </div>
           <div style={{ color: "#475569", fontSize: 11, marginTop: 2 }}>
-            {graph.node_count} nodes
+            {graph.node_count} {t.nodes}
           </div>
         </div>
         <button

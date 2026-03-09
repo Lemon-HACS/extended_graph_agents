@@ -10,6 +10,7 @@ declare global {
 interface HassData {
   connection: import("./utils/haApi").HassConnection;
   auth: { data: { access_token: string } };
+  language?: string;
 }
 
 class ExtendedGraphAgentsPanel extends HTMLElement {

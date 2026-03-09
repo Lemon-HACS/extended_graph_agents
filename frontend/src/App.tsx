@@ -8,15 +8,19 @@ import { listGraphs, getGraph, saveGraph, deleteGraph } from "./utils/haApi";
 import type { HassConnection } from "./utils/haApi";
 import { graphToYaml } from "./utils/serializer";
 import { useWindowSize } from "./hooks/useWindowSize";
+import { LangContext, useLang } from "./contexts/LangContext";
+import { getTranslations } from "./utils/i18n";
 
 interface AppProps {
   hass: {
     connection: HassConnection;
     auth: { data: { access_token: string } };
+    language?: string;
   };
 }
 
 export function App({ hass }: AppProps) {
+  const t = getTranslations(hass.language ?? "en");
   const [showYaml, setShowYaml] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -89,7 +93,7 @@ export function App({ hass }: AppProps) {
       addLog("info", `그래프 저장 완료: "${graphDef.name}"`);
     } catch (err) {
       addLog("error", `그래프 저장 실패: ${String(err)}`);
-      alert("Failed to save graph: " + String(err));
+      alert(t.failedToSave(String(err)));
     } finally {
       setIsSaving(false);
     }
@@ -97,7 +101,7 @@ export function App({ hass }: AppProps) {
 
   const handleDelete = useCallback(
     async (id: string) => {
-      if (!confirm(`Delete graph "${id}"?`)) return;
+      if (!confirm(t.confirmDelete(id))) return;
       addLog("warn", `그래프 삭제: ${id}`);
       try {
         await deleteGraph(conn, id);
@@ -119,6 +123,7 @@ export function App({ hass }: AppProps) {
     : "";
 
   return (
+    <LangContext.Provider value={t}>
     <div
       style={{
         display: "flex",
@@ -206,7 +211,7 @@ export function App({ hass }: AppProps) {
                 onClick={() => setShowYaml(!showYaml)}
                 style={secondaryBtnStyle(isMobile)}
               >
-                {showYaml ? "← Graph" : "YAML"}
+                {showYaml ? t.backToGraph : t.yaml}
               </button>
 
               <button
@@ -217,7 +222,7 @@ export function App({ hass }: AppProps) {
                   opacity: isSaving || !isDirty ? 0.5 : 1,
                 }}
               >
-                {isSaving ? "..." : isDirty ? "Save*" : "Saved"}
+                {isSaving ? t.saving : isDirty ? t.save : t.saved}
               </button>
             </>
           )}
@@ -230,7 +235,7 @@ export function App({ hass }: AppProps) {
               borderColor: showDebug ? "#3b82f6" : "#334155",
             }}
           >
-            {isMobile ? "🐛" : "DEBUG"}
+            {isMobile ? "🐛" : t.debug}
           </button>
         </div>
 
@@ -275,17 +280,19 @@ export function App({ hass }: AppProps) {
         </div>
       </div>
     </div>
+    </LangContext.Provider>
   );
 }
 
 function GraphMetaEditor({ isMobile }: { isMobile?: boolean }) {
   const { currentGraph, updateGraphMeta } = useGraphStore();
+  const t = useLang();
   if (!currentGraph) return null;
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: isMobile ? 1 : undefined }}>
       {!isMobile && (
-        <span style={{ color: "#94a3b8", fontSize: 13, flexShrink: 0 }}>Graph:</span>
+        <span style={{ color: "#94a3b8", fontSize: 13, flexShrink: 0 }}>{t.graphLabel}</span>
       )}
       <input
         value={currentGraph.name}

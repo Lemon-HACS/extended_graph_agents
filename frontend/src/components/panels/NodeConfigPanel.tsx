@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useGraphStore } from "../../store/graphStore";
+import { useLang } from "../../contexts/LangContext";
 import type { GraphNode, FunctionTool, RouteConfig } from "../../types";
 
 interface NodeConfigPanelProps {
@@ -10,6 +11,7 @@ interface NodeConfigPanelProps {
 
 export function NodeConfigPanel({ onClose, isMobile, panelWidth = 380 }: NodeConfigPanelProps) {
   const { flowNodes, selectedNodeId, updateNodeData } = useGraphStore();
+  const t = useLang();
   const selectedNode = flowNodes.find((n) => n.id === selectedNodeId);
 
   if (!selectedNode) return null;
@@ -62,7 +64,7 @@ export function NodeConfigPanel({ onClose, isMobile, panelWidth = 380 }: NodeCon
           <div style={{ color: "#94a3b8", fontSize: 11, marginBottom: 2 }}>
             {data.type === "router" ? "🔀 ROUTER" : "🤖 AGENT"}
           </div>
-          <div style={{ color: "white", fontWeight: 600 }}>Node Config</div>
+          <div style={{ color: "white", fontWeight: 600 }}>{t.nodeConfig}</div>
         </div>
         <button
           onClick={onClose}
@@ -82,11 +84,11 @@ export function NodeConfigPanel({ onClose, isMobile, panelWidth = 380 }: NodeCon
       {/* Scrollable content */}
       <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
         {/* Common fields */}
-        <Field label="Node ID">
+        <Field label={t.nodeId}>
           <input value={data.id} readOnly style={inputStyle} />
         </Field>
 
-        <Field label="Name">
+        <Field label={t.name}>
           <input
             value={data.name ?? ""}
             onChange={(e) => update("name", e.target.value)}
@@ -94,16 +96,16 @@ export function NodeConfigPanel({ onClose, isMobile, panelWidth = 380 }: NodeCon
           />
         </Field>
 
-        <Field label="Model (optional)">
+        <Field label={t.modelOptional}>
           <input
             value={data.model ?? ""}
             onChange={(e) => update("model", e.target.value || undefined)}
-            placeholder="gpt-4o (inherited from graph)"
+            placeholder={t.modelPlaceholder}
             style={inputStyle}
           />
         </Field>
 
-        <Field label="System Prompt">
+        <Field label={t.systemPrompt}>
           <textarea
             value={data.prompt ?? ""}
             onChange={(e) => update("prompt", e.target.value)}
@@ -133,6 +135,7 @@ function RouterConfig({
   data: GraphNode;
   update: (f: string, v: unknown) => void;
 }) {
+  const t = useLang();
   const routes = data.routes ?? [];
 
   const addRoute = () => {
@@ -155,7 +158,7 @@ function RouterConfig({
 
   return (
     <div>
-      <Field label="Output Key">
+      <Field label={t.outputKey}>
         <input
           value={data.output_key ?? "route"}
           onChange={(e) => update("output_key", e.target.value)}
@@ -172,7 +175,7 @@ function RouterConfig({
             fontWeight: 600,
           }}
         >
-          ROUTES
+          {t.routes}
         </div>
         {routes.map((route, i) => (
           <div
@@ -192,7 +195,7 @@ function RouterConfig({
               }}
             >
               <span style={{ color: "#94a3b8", fontSize: 11 }}>
-                Route {i + 1}
+                {t.route} {i + 1}
               </span>
               <button
                 onClick={() => removeRoute(i)}
@@ -207,15 +210,15 @@ function RouterConfig({
                 ✕
               </button>
             </div>
-            <Field label="Match Value">
+            <Field label={t.matchValue}>
               <input
                 value={route.match}
                 onChange={(e) => updateRoute(i, "match", e.target.value)}
-                placeholder="e.g. smart_home or * for default"
+                placeholder={t.matchPlaceholder}
                 style={inputStyle}
               />
             </Field>
-            <Field label="Next Node IDs (comma separated)">
+            <Field label={t.nextNodeIds}>
               <input
                 value={(route.next ?? []).join(", ")}
                 onChange={(e) =>
@@ -231,20 +234,20 @@ function RouterConfig({
                 style={inputStyle}
               />
             </Field>
-            <Field label="Execution Mode">
+            <Field label={t.executionMode}>
               <select
                 value={route.mode ?? "sequential"}
                 onChange={(e) => updateRoute(i, "mode", e.target.value)}
                 style={inputStyle}
               >
-                <option value="sequential">Sequential</option>
-                <option value="parallel">Parallel ∥</option>
+                <option value="sequential">{t.sequential}</option>
+                <option value="parallel">{t.parallel}</option>
               </select>
             </Field>
           </div>
         ))}
         <button onClick={addRoute} style={addBtnStyle}>
-          + Add Route
+          {t.addRoute}
         </button>
       </div>
     </div>
@@ -258,6 +261,7 @@ function RegularConfig({
   data: GraphNode;
   update: (f: string, v: unknown) => void;
 }) {
+  const t = useLang();
   const functions = data.functions ?? [];
   const skills = data.skills ?? [];
 
@@ -306,7 +310,7 @@ function RegularConfig({
             fontWeight: 600,
           }}
         >
-          FUNCTIONS
+          {t.functions}
         </div>
         {functions.map((func, i) => (
           <FunctionEditor
@@ -318,7 +322,7 @@ function RegularConfig({
           />
         ))}
         <button onClick={addFunction} style={addBtnStyle}>
-          + Add Function
+          {t.addFunction}
         </button>
       </div>
 
@@ -331,7 +335,7 @@ function RegularConfig({
             fontWeight: 600,
           }}
         >
-          SKILLS
+          {t.skills}
         </div>
         <input
           value={skills.join(", ")}
@@ -344,7 +348,7 @@ function RegularConfig({
                 .filter(Boolean)
             )
           }
-          placeholder="skill1, skill2"
+          placeholder={t.skillsPlaceholder}
           style={inputStyle}
         />
       </div>
@@ -363,6 +367,7 @@ function FunctionEditor({
   onChange: (f: Partial<FunctionTool>) => void;
   onRemove: () => void;
 }) {
+  const t = useLang();
   const FUNCTION_TYPES = [
     "native",
     "template",
@@ -390,7 +395,7 @@ function FunctionEditor({
         }}
       >
         <span style={{ color: "#94a3b8", fontSize: 11 }}>
-          Function {index + 1}
+          {t.functionLabel} {index + 1}
         </span>
         <button
           onClick={onRemove}
@@ -405,7 +410,7 @@ function FunctionEditor({
         </button>
       </div>
 
-      <Field label="Name">
+      <Field label={t.name}>
         <input
           value={func.spec.name}
           onChange={(e) =>
@@ -415,7 +420,7 @@ function FunctionEditor({
         />
       </Field>
 
-      <Field label="Description">
+      <Field label={t.description}>
         <input
           value={func.spec.description}
           onChange={(e) =>
@@ -425,7 +430,7 @@ function FunctionEditor({
         />
       </Field>
 
-      <Field label="Function Type">
+      <Field label={t.functionType}>
         <select
           value={func.function.type}
           onChange={(e) =>
@@ -433,16 +438,16 @@ function FunctionEditor({
           }
           style={inputStyle}
         >
-          {FUNCTION_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
+          {FUNCTION_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {type}
             </option>
           ))}
         </select>
       </Field>
 
       {/* Type-specific config as JSON */}
-      <Field label="Function Config (JSON)">
+      <Field label={t.functionConfig}>
         <textarea
           value={JSON.stringify(func.function, null, 2)}
           onChange={(e) => {
