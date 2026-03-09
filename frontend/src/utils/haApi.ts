@@ -40,3 +40,35 @@ export async function deleteGraph(conn: HassConnection, graphId: string) {
     graph_id: graphId,
   });
 }
+
+export async function listSkills(conn: HassConnection) {
+  const result = (await conn.sendMessagePromise({
+    type: `${DOMAIN}/list_skills`,
+  })) as { skills: import("../types").SkillSummary[] };
+  return result.skills;
+}
+
+export async function getSkill(conn: HassConnection, skillId: string) {
+  const result = (await conn.sendMessagePromise({
+    type: `${DOMAIN}/get_skill`,
+    skill_id: skillId,
+  })) as { skill: import("../types").SkillDefinition };
+  return result.skill;
+}
+
+export async function saveSkill(
+  conn: HassConnection,
+  skill: import("../types").SkillDefinition
+) {
+  await conn.sendMessagePromise({
+    type: `${DOMAIN}/save_skill`,
+    skill,
+  });
+}
+
+export async function deleteSkill(conn: HassConnection, skillId: string) {
+  await conn.sendMessagePromise({
+    type: `${DOMAIN}/delete_skill`,
+    skill_id: skillId,
+  });
+}

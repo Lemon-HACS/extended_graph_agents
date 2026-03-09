@@ -55,6 +55,22 @@ export interface GraphSummary {
   node_count: number;
 }
 
+export interface SkillSummary {
+  id: string;
+  name: string;
+  group: string;
+  description: string;
+  function_count: number;
+}
+
+export interface SkillDefinition {
+  id: string;
+  name: string;
+  group?: string;
+  description?: string;
+  functions: FunctionTool[];
+}
+
 export interface ExecutionTrace {
   type: "node_started" | "node_finished" | "graph_finished";
   node_id?: string;

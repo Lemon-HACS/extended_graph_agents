@@ -55,8 +55,36 @@ class RegularNode(BaseNode):
             {"role": "user", "content": user_content},
         ]
 
-        # Build tools from function configs
-        function_tools_config = config.get("functions", [])
+        # Build tools from function configs: inline + skill functions merged
+        function_tools_config = list(config.get("functions", []))
+
+        # Prepend skill functions (inline overrides skill via dedup below)
+        skill_ids = config.get("skills", [])
+        if skill_ids:
+            from pathlib import Path
+            from ..skill_loader import SkillLoader
+            from ..const import SKILLS_SUBDIR
+            skills_dir = Path(hass.config.config_dir) / SKILLS_SUBDIR
+            loader = SkillLoader(str(skills_dir))
+            skill_functions: list[dict] = []
+            for skill_id in skill_ids:
+                try:
+                    skill = loader.load_by_id(skill_id)
+                    skill_functions.extend(skill.functions)
+                except Exception as err:
+                    _LOGGER.warning("Could not load skill '%s': %s", skill_id, err)
+            function_tools_config = skill_functions + function_tools_config
+
+        # Deduplicate by spec.name (first occurrence wins → inline overrides skill)
+        seen_names: set[str] = set()
+        deduped: list[dict] = []
+        for ft in function_tools_config:
+            spec_name = ft.get("spec", {}).get("name")
+            if spec_name and spec_name not in seen_names:
+                seen_names.add(spec_name)
+                deduped.append(ft)
+        function_tools_config = deduped
+
         tools = []
         for func_tool in function_tools_config:
             if "spec" in func_tool:

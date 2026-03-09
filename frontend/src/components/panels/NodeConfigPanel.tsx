@@ -1,7 +1,9 @@
 import { useCallback } from "react";
 import { useGraphStore } from "../../store/graphStore";
+import { useSkillStore } from "../../store/skillStore";
 import { useLang } from "../../contexts/LangContext";
 import type { GraphNode, FunctionTool } from "../../types";
+import { FunctionEditor, Field, inputStyle, addBtnStyle } from "../shared/FunctionEditor";
 
 interface NodeConfigPanelProps {
   onClose: () => void;
@@ -414,183 +416,88 @@ function RegularConfig({
         >
           {t.skills}
         </div>
-        <input
-          value={skills.join(", ")}
-          onChange={(e) =>
-            update(
-              "skills",
-              e.target.value
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean)
-            )
-          }
-          placeholder={t.skillsPlaceholder}
-          style={inputStyle}
+        <SkillMultiSelect
+          selectedIds={skills}
+          onChange={(ids) => update("skills", ids)}
         />
       </div>
     </div>
   );
 }
 
-function FunctionEditor({
-  index,
-  func,
+function SkillMultiSelect({
+  selectedIds,
   onChange,
-  onRemove,
 }: {
-  index: number;
-  func: FunctionTool;
-  onChange: (f: Partial<FunctionTool>) => void;
-  onRemove: () => void;
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
 }) {
+  const { skillList } = useSkillStore();
   const t = useLang();
-  const FUNCTION_TYPES = [
-    "native",
-    "template",
-    "script",
-    "web",
-    "bash",
-    "file",
-    "sqlite",
-  ];
+
+  const available = skillList.filter((s) => !selectedIds.includes(s.id));
+
+  const remove = (id: string) => onChange(selectedIds.filter((sid) => sid !== id));
+  const add = (id: string) => { if (id) onChange([...selectedIds, id]); };
 
   return (
-    <div
-      style={{
-        background: "#1e293b",
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 8,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: 8,
-        }}
+    <div>
+      {selectedIds.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+          {selectedIds.map((id) => {
+            const skill = skillList.find((s) => s.id === id);
+            return (
+              <span
+                key={id}
+                style={{
+                  background: "#1e1a3a",
+                  border: "1px solid #6d28d9",
+                  color: "#a78bfa",
+                  borderRadius: 4,
+                  padding: "2px 6px",
+                  fontSize: 11,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                {skill?.name ?? id}
+                <button
+                  onClick={() => remove(id)}
+                  style={{ background: "none", border: "none", color: "#a78bfa", cursor: "pointer", padding: 0, fontSize: 11 }}
+                >
+                  ✕
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+      <select
+        value=""
+        onChange={(e) => add(e.target.value)}
+        style={{ ...inputStyle, color: available.length === 0 ? "#475569" : "white" }}
+        disabled={available.length === 0}
       >
-        <span style={{ color: "#94a3b8", fontSize: 11 }}>
-          {t.functionLabel} {index + 1}
-        </span>
-        <button
-          onClick={onRemove}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#ef4444",
-            cursor: "pointer",
-          }}
-        >
-          ✕
-        </button>
-      </div>
-
-      <Field label={t.name}>
-        <input
-          value={func.spec.name}
-          onChange={(e) =>
-            onChange({ spec: { ...func.spec, name: e.target.value } })
-          }
-          style={inputStyle}
-        />
-      </Field>
-
-      <Field label={t.description}>
-        <input
-          value={func.spec.description}
-          onChange={(e) =>
-            onChange({ spec: { ...func.spec, description: e.target.value } })
-          }
-          style={inputStyle}
-        />
-      </Field>
-
-      <Field label={t.functionType}>
-        <select
-          value={func.function.type}
-          onChange={(e) =>
-            onChange({ function: { ...func.function, type: e.target.value } })
-          }
-          style={inputStyle}
-        >
-          {FUNCTION_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
-      </Field>
-
-      {/* Type-specific config as JSON */}
-      <Field label={t.functionConfig}>
-        <textarea
-          value={JSON.stringify(func.function, null, 2)}
-          onChange={(e) => {
-            try {
-              const parsed = JSON.parse(e.target.value);
-              onChange({ function: parsed });
-            } catch {
-              // ignore parse errors while typing
-            }
-          }}
-          rows={4}
-          style={{
-            ...inputStyle,
-            fontFamily: "monospace",
-            fontSize: 11,
-            resize: "vertical",
-          }}
-        />
-      </Field>
+        <option value="">{available.length === 0 ? (skillList.length === 0 ? t.noSkillsYet : "모두 추가됨") : `+ ${t.skills} 추가...`}</option>
+        {Object.entries(
+          available.reduce<Record<string, typeof available>>((acc, s) => {
+            const g = s.group || t.ungrouped;
+            if (!acc[g]) acc[g] = [];
+            acc[g].push(s);
+            return acc;
+          }, {})
+        ).map(([group, items]) => (
+          <optgroup key={group} label={group}>
+            {items.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} ({s.function_count} fn)
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
     </div>
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <label
-        style={{
-          display: "block",
-          color: "#94a3b8",
-          fontSize: 11,
-          marginBottom: 4,
-        }}
-      >
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  background: "#0f172a",
-  border: "1px solid #334155",
-  borderRadius: 6,
-  color: "white",
-  padding: "6px 10px",
-  fontSize: 13,
-  boxSizing: "border-box",
-};
-
-const addBtnStyle: React.CSSProperties = {
-  background: "#1e3a1e",
-  border: "1px dashed #22c55e",
-  color: "#4ade80",
-  borderRadius: 6,
-  padding: "6px 12px",
-  cursor: "pointer",
-  fontSize: 12,
-  width: "100%",
-  marginTop: 4,
-};

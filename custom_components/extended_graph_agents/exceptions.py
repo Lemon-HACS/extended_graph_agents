@@ -51,3 +51,13 @@ class GraphExecutionError(ExtendedGraphAgentsError):
 
 class RouterError(ExtendedGraphAgentsError):
     pass
+
+
+class SkillNotFound(ExtendedGraphAgentsError):
+    def __init__(self, skill_id: str):
+        super().__init__(f"Skill not found: {skill_id}")
+        self.skill_id = skill_id
+
+
+class InvalidSkill(ExtendedGraphAgentsError):
+    pass

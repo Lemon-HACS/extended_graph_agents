@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { GraphList } from "./components/panels/GraphList";
+import { SkillsPanel } from "./components/panels/SkillsPanel";
 import { GraphEditor } from "./components/GraphEditor";
 import { NodeConfigPanel } from "./components/panels/NodeConfigPanel";
 import { EdgeConfigPanel } from "./components/panels/EdgeConfigPanel";
 import { DebugPanel } from "./components/panels/DebugPanel";
 import { useGraphStore } from "./store/graphStore";
-import { listGraphs, getGraph, saveGraph, deleteGraph } from "./utils/haApi";
+import { useSkillStore } from "./store/skillStore";
+import { listGraphs, getGraph, saveGraph, deleteGraph, listSkills } from "./utils/haApi";
 import type { HassConnection } from "./utils/haApi";
 import { graphToYaml } from "./utils/serializer";
 import { useWindowSize } from "./hooks/useWindowSize";
@@ -25,6 +27,8 @@ export function App({ hass }: AppProps) {
   const [showYaml, setShowYaml] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [sidebarView, setSidebarView] = useState<"graphs" | "skills">("graphs");
+  const { setSkillList } = useSkillStore();
   const {
     graphList,
     setGraphList,
@@ -53,7 +57,7 @@ export function App({ hass }: AppProps) {
 
   const conn = hass.connection;
 
-  // Load graph list on mount
+  // Load graph list and skill list on mount
   useEffect(() => {
     addLog("info", "그래프 목록 로드 중...");
     listGraphs(conn)
@@ -64,6 +68,9 @@ export function App({ hass }: AppProps) {
       .catch((err) => {
         addLog("error", `그래프 목록 로드 실패: ${String(err)}`);
       });
+    listSkills(conn)
+      .then((list) => setSkillList(list))
+      .catch(() => {/* skills dir may not exist yet */});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conn]);
 
@@ -155,14 +162,81 @@ export function App({ hass }: AppProps) {
 
       {/* Sidebar */}
       {(!isMobile || showSidebar) && (
-        <GraphList
-          onSelect={handleSelectGraph}
-          onNew={handleNew}
-          onDelete={handleDelete}
-          isMobile={isMobile}
-          onClose={() => setShowSidebar(false)}
-          sidebarWidth={sidebarWidth}
-        />
+        <div
+          style={{
+            width: isMobile ? "100%" : sidebarWidth,
+            display: "flex",
+            flexDirection: "column",
+            borderRight: "1px solid #1e293b",
+            background: "#0a0f1e",
+            flexShrink: 0,
+            ...(isMobile
+              ? { position: "absolute", top: 0, left: 0, bottom: 0, zIndex: 50 }
+              : {}),
+          }}
+        >
+          {/* Tab nav */}
+          <div style={{ display: "flex", borderBottom: "1px solid #1e293b", flexShrink: 0 }}>
+            {(["graphs", "skills"] as const).map((view) => (
+              <button
+                key={view}
+                onClick={() => setSidebarView(view)}
+                style={{
+                  flex: 1,
+                  background: "none",
+                  border: "none",
+                  borderBottom: sidebarView === view ? "2px solid #3b82f6" : "2px solid transparent",
+                  color: sidebarView === view ? "#60a5fa" : "#64748b",
+                  padding: "8px 0",
+                  cursor: "pointer",
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}
+              >
+                {view === "graphs" ? t.graphsTab : t.skillsTab}
+              </button>
+            ))}
+          </div>
+
+          {/* Content */}
+          <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+            {sidebarView === "graphs" ? (
+              <GraphList
+                onSelect={handleSelectGraph}
+                onNew={handleNew}
+                onDelete={handleDelete}
+                isMobile={false}
+                onClose={() => setShowSidebar(false)}
+                sidebarWidth={sidebarWidth}
+              />
+            ) : (
+              <SkillsPanel
+                conn={conn}
+                sidebarWidth={sidebarWidth}
+                onClose={() => setShowSidebar(false)}
+              />
+            )}
+          </div>
+
+          {isMobile && (
+            <button
+              onClick={() => setShowSidebar(false)}
+              style={{
+                position: "absolute",
+                top: 8,
+                right: 8,
+                background: "none",
+                border: "none",
+                color: "#94a3b8",
+                cursor: "pointer",
+                fontSize: 18,
+                zIndex: 10,
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
       )}
 
       {/* Main area */}

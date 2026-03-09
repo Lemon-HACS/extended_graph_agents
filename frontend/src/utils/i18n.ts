@@ -60,6 +60,25 @@ const en = {
   // Dialogs
   confirmDelete: (id: string) => `Delete graph "${id}"?`,
   failedToSave: (err: string) => `Failed to save graph: ${err}`,
+
+  // Sidebar tabs
+  graphsTab: "Graphs",
+  skillsTab: "Skills",
+
+  // SkillsPanel
+  newSkill: "+ New Skill",
+  noSkillsYet: "No skills yet.",
+  ungrouped: "Ungrouped",
+  skillName: "Skill Name",
+  skillGroup: "Group",
+  skillDescription: "Description",
+  saveSkill: "Save Skill",
+  deleteSkill: "Delete",
+  visualTab: "Visual",
+  yamlTab: "YAML",
+  applyYaml: "Apply YAML",
+  confirmDeleteSkill: (name: string) => `Delete skill "${name}"?`,
+  failedToSaveSkill: (err: string) => `Failed to save skill: ${err}`,
 };
 
 const ko: typeof en = {
@@ -124,6 +143,25 @@ const ko: typeof en = {
   // Dialogs
   confirmDelete: (id: string) => `"${id}" 그래프를 삭제하시겠습니까?`,
   failedToSave: (err: string) => `그래프 저장 실패: ${err}`,
+
+  // Sidebar tabs
+  graphsTab: "그래프",
+  skillsTab: "스킬",
+
+  // SkillsPanel
+  newSkill: "+ 새 스킬",
+  noSkillsYet: "스킬이 없습니다.",
+  ungrouped: "미분류",
+  skillName: "스킬 이름",
+  skillGroup: "그룹",
+  skillDescription: "설명",
+  saveSkill: "스킬 저장",
+  deleteSkill: "삭제",
+  visualTab: "비주얼",
+  yamlTab: "YAML",
+  applyYaml: "YAML 적용",
+  confirmDeleteSkill: (name: string) => `"${name}" 스킬을 삭제하시겠습니까?`,
+  failedToSaveSkill: (err: string) => `스킬 저장 실패: ${err}`,
 };
 
 export type Translations = typeof en;
