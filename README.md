@@ -485,6 +485,17 @@ npm run build
 
 ## 변경 이력
 
+### v1.0.23
+- **함수 비주얼 에디터**: JSON 직접 편집 대신 타입별 폼 UI 제공
+  - 파라미터 에디터: 이름/타입/설명/필수 여부/enum 값 리스트로 편집
+  - `native`: service + data key-value 에디터
+  - `template`: value_template textarea
+  - `web`: url, method select, headers key-value
+  - `bash`: command textarea
+  - `file`: operation select + path
+  - `sqlite`: db_path + allow_write 토글
+  - `script`: sequence JSON textarea (복잡한 구조 유지)
+
 ### v1.0.22
 - 사이드바 스킬 탭이 표시되지 않던 레이아웃 버그 수정 (GraphList/SkillsPanel 고정 너비 제거)
 
