@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Extended Graph Agents",
+        "description": "OpenAI 호환 API 연결을 설정합니다.",
+        "data": {
+          "api_key": "API 키",
+          "base_url": "Base URL"
+        },
+        "data_description": {
+          "api_key": "OpenAI 또는 호환 API의 API 키를 입력하세요.",
+          "base_url": "기본값은 OpenAI API입니다. 다른 호환 API를 사용하는 경우 URL을 변경하세요."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "API에 연결할 수 없습니다. API 키와 Base URL을 확인하세요."
+    }
+  }
+}

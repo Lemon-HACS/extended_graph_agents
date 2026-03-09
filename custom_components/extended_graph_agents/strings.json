@@ -3,15 +3,19 @@
     "step": {
       "user": {
         "title": "Extended Graph Agents",
-        "description": "Configure your OpenAI API connection",
+        "description": "Configure your OpenAI-compatible API connection.",
         "data": {
           "api_key": "API Key",
           "base_url": "Base URL"
+        },
+        "data_description": {
+          "api_key": "Enter the API key for OpenAI or a compatible API.",
+          "base_url": "Defaults to the OpenAI API. Change this URL if you are using a compatible third-party API."
         }
       }
     },
     "error": {
-      "cannot_connect": "Cannot connect to the API"
+      "cannot_connect": "Cannot connect to the API. Please check your API key and Base URL."
     }
   }
 }
