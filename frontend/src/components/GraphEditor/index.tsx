@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import {
   ReactFlow,
+  ReactFlowProvider,
   Controls,
   Background,
   MiniMap,
@@ -9,6 +10,7 @@ import {
   applyEdgeChanges,
   BackgroundVariant,
   Panel,
+  useReactFlow,
 } from "@xyflow/react";
 import type { Connection, NodeChange, EdgeChange } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -36,14 +38,56 @@ interface GraphEditorProps {
 }
 
 export function GraphEditor({ onNodeClick }: GraphEditorProps) {
+  const { currentGraph } = useGraphStore();
+
+  if (!currentGraph) {
+    return (
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#020817",
+        }}
+      >
+        <div style={{ textAlign: "center", color: "#475569" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🕸️</div>
+          <div
+            style={{
+              fontSize: 18,
+              fontWeight: 600,
+              color: "#64748b",
+              marginBottom: 8,
+            }}
+          >
+            No graph selected
+          </div>
+          <div style={{ fontSize: 14 }}>
+            Select a graph from the sidebar or create a new one
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ReactFlowProvider>
+      <GraphEditorInner onNodeClick={onNodeClick} />
+    </ReactFlowProvider>
+  );
+}
+
+function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
   const {
     flowNodes,
     flowEdges,
     updateNodes,
     updateEdges,
     addNode,
-    currentGraph,
   } = useGraphStore();
+
+  const { screenToFlowPosition } = useReactFlow();
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -80,53 +124,19 @@ export function GraphEditor({ onNodeClick }: GraphEditorProps) {
         | "router"
         | "regular";
       if (!type) return;
-      const rect = (event.target as HTMLElement)
-        .closest(".react-flow")
-        ?.getBoundingClientRect();
-      if (!rect) return;
-      addNode(type, {
-        x: event.clientX - rect.left - 90,
-        y: event.clientY - rect.top - 30,
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
       });
+      addNode(type, position);
     },
-    [addNode]
+    [screenToFlowPosition, addNode]
   );
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   }, []);
-
-  if (!currentGraph) {
-    return (
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#020817",
-        }}
-      >
-        <div style={{ textAlign: "center", color: "#475569" }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🕸️</div>
-          <div
-            style={{
-              fontSize: 18,
-              fontWeight: 600,
-              color: "#64748b",
-              marginBottom: 8,
-            }}
-          >
-            No graph selected
-          </div>
-          <div style={{ fontSize: 14 }}>
-            Select a graph from the sidebar or create a new one
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div style={{ flex: 1, position: "relative" }}>
