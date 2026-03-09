@@ -91,6 +91,18 @@ const en = {
   addHeader: "+ Add Header",
   allowWrite: "Allow Write (INSERT / UPDATE / DELETE)",
   sequenceJson: "Sequence (JSON)",
+  bashCommand: "Command",
+  valueTemplate: "value_template",
+  functionConfigSection: "Function Config",
+
+  // FunctionEditor - function type display names
+  funcTypeNative: "HA Service (native)",
+  funcTypeTemplate: "Jinja2 Template (template)",
+  funcTypeScript: "HA Script (script)",
+  funcTypeWeb: "HTTP Request (web)",
+  funcTypeBash: "Shell Command (bash)",
+  funcTypeFile: "File (file)",
+  funcTypeSqlite: "SQLite (sqlite)",
 
   // FunctionEditor - field labels
   nativeService: "Service",
@@ -205,6 +217,18 @@ const ko: typeof en = {
   addHeader: "+ 헤더 추가",
   allowWrite: "쓰기 허용 (INSERT / UPDATE / DELETE)",
   sequenceJson: "시퀀스 (JSON)",
+  bashCommand: "명령어",
+  valueTemplate: "value_template",
+  functionConfigSection: "함수 설정",
+
+  // FunctionEditor - function type display names
+  funcTypeNative: "HA 서비스 (native)",
+  funcTypeTemplate: "Jinja2 템플릿 (template)",
+  funcTypeScript: "HA 스크립트 (script)",
+  funcTypeWeb: "HTTP 요청 (web)",
+  funcTypeBash: "쉘 명령어 (bash)",
+  funcTypeFile: "파일 (file)",
+  funcTypeSqlite: "SQLite (sqlite)",
 
   // FunctionEditor - field labels
   nativeService: "서비스",

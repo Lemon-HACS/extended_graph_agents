@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useLang } from "../../contexts/LangContext";
 import type { FunctionTool, FunctionConfig } from "../../types";
+import type { Translations } from "../../utils/i18n";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -16,7 +18,6 @@ interface KVEntry {
   value: string;
 }
 
-const FUNCTION_TYPES = ["native", "template", "script", "web", "bash", "file", "sqlite"];
 const PARAM_TYPES = ["string", "integer", "number", "boolean", "array", "object"] as const;
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 const FILE_OPS = ["read", "write", "append"];
@@ -53,8 +54,23 @@ function parseKV(obj: Record<string, unknown>): KVEntry[] {
   return Object.entries(obj ?? {}).map(([key, value]) => ({ key, value: String(value) }));
 }
 
+// buildKV only persists entries with non-empty keys
 function buildKV(entries: KVEntry[]): Record<string, string> {
   return Object.fromEntries(entries.filter((e) => e.key).map((e) => [e.key, e.value]));
+}
+
+// ── Function type options ──────────────────────────────────────────────────────
+
+function getFunctionTypeOptions(t: Translations) {
+  return [
+    { value: "native", label: t.funcTypeNative },
+    { value: "template", label: t.funcTypeTemplate },
+    { value: "script", label: t.funcTypeScript },
+    { value: "web", label: t.funcTypeWeb },
+    { value: "bash", label: t.funcTypeBash },
+    { value: "file", label: t.funcTypeFile },
+    { value: "sqlite", label: t.funcTypeSqlite },
+  ];
 }
 
 // ── UsageHint ──────────────────────────────────────────────────────────────────
@@ -113,6 +129,8 @@ export function FunctionEditor({
     onChange({ function: { ...func.function, ...patch } });
   };
 
+  const typeOptions = getFunctionTypeOptions(t);
+
   return (
     <div style={{ background: "#1e293b", borderRadius: 8, padding: 12, marginBottom: 8 }}>
       {/* Header */}
@@ -152,8 +170,8 @@ export function FunctionEditor({
           onChange={(e) => onChange({ function: { type: e.target.value } })}
           style={inputStyle}
         >
-          {FUNCTION_TYPES.map((ft) => (
-            <option key={ft} value={ft}>{ft}</option>
+          {typeOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
       </Field>
@@ -174,7 +192,7 @@ export function FunctionEditor({
       {/* Type-specific function config */}
       <div style={{ marginTop: 10, borderTop: "1px solid #334155", paddingTop: 10 }}>
         <div style={{ color: "#64748b", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", marginBottom: 6, textTransform: "uppercase" }}>
-          {t.functionConfig}
+          {t.functionConfigSection}
         </div>
         <TypeConfig config={func.function} onChange={updateFunctionConfig} />
       </div>
@@ -273,11 +291,12 @@ function TypeConfig({
 
 function NativeConfig({ config, onChange }: { config: FunctionConfig; onChange: (p: Partial<FunctionConfig>) => void }) {
   const t = useLang();
-  const data = parseKV((config.data ?? {}) as Record<string, unknown>);
+  // Local state so empty-key rows are preserved while typing
+  const [data, setData] = useState<KVEntry[]>(() => parseKV((config.data ?? {}) as Record<string, unknown>));
 
-  const updateData = (entries: KVEntry[]) => onChange({ data: buildKV(entries) });
-  const setEntry = (i: number, patch: Partial<KVEntry>) => {
-    updateData(data.map((e, idx) => (idx === i ? { ...e, ...patch } : e)));
+  const updateData = (entries: KVEntry[]) => {
+    setData(entries);
+    onChange({ data: buildKV(entries) });
   };
 
   return (
@@ -297,13 +316,13 @@ function NativeConfig({ config, onChange }: { config: FunctionConfig; onChange: 
           <div key={i} style={{ display: "flex", gap: 4, marginBottom: 4 }}>
             <input
               value={entry.key}
-              onChange={(e) => setEntry(i, { key: e.target.value })}
+              onChange={(e) => updateData(data.map((d, idx) => idx === i ? { ...d, key: e.target.value } : d))}
               placeholder="entity_id"
               style={{ ...inputStyle, flex: 1, fontSize: 11 }}
             />
             <input
               value={entry.value}
-              onChange={(e) => setEntry(i, { value: e.target.value })}
+              onChange={(e) => updateData(data.map((d, idx) => idx === i ? { ...d, value: e.target.value } : d))}
               placeholder='{{ entity_id }}'
               style={{ ...inputStyle, flex: 2, fontSize: 11, fontFamily: "monospace" }}
             />
@@ -326,7 +345,7 @@ function TemplateConfig({ config, onChange }: { config: FunctionConfig; onChange
   return (
     <>
       <UsageHint text={t.templateUsage} />
-      <Field label="value_template">
+      <Field label={t.valueTemplate}>
         <textarea
           value={(config.value_template as string) ?? ""}
           onChange={(e) => onChange({ value_template: e.target.value })}
@@ -343,8 +362,13 @@ function TemplateConfig({ config, onChange }: { config: FunctionConfig; onChange
 
 function WebConfig({ config, onChange }: { config: FunctionConfig; onChange: (p: Partial<FunctionConfig>) => void }) {
   const t = useLang();
-  const headers = parseKV((config.headers ?? {}) as Record<string, unknown>);
-  const updateHeaders = (entries: KVEntry[]) => onChange({ headers: buildKV(entries) });
+  // Local state so empty-key header rows are preserved while typing
+  const [headers, setHeaders] = useState<KVEntry[]>(() => parseKV((config.headers ?? {}) as Record<string, unknown>));
+
+  const updateHeaders = (entries: KVEntry[]) => {
+    setHeaders(entries);
+    onChange({ headers: buildKV(entries) });
+  };
 
   return (
     <>
@@ -389,7 +413,7 @@ function BashConfig({ config, onChange }: { config: FunctionConfig; onChange: (p
   return (
     <>
       <UsageHint text={t.bashUsage} />
-      <Field label="Command">
+      <Field label={t.bashCommand}>
         <textarea
           value={(config.command as string) ?? ""}
           onChange={(e) => onChange({ command: e.target.value })}
