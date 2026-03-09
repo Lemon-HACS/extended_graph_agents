@@ -5,7 +5,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
-from .const import DOMAIN
+from .const import DOMAIN, EVENT_GRAPH_SAVED, EVENT_GRAPH_DELETED
 from .graph_loader import GraphLoader
 from .exceptions import GraphNotFound, InvalidGraph
 
@@ -90,6 +90,11 @@ def ws_save_graph(
     loader = _get_loader(hass)
     try:
         loader.save(msg["graph"])
+        graph_data = msg["graph"]
+        hass.bus.async_fire(EVENT_GRAPH_SAVED, {
+            "graph_id": graph_data.get("id"),
+            "graph_name": graph_data.get("name") or graph_data.get("id"),
+        })
         connection.send_result(msg["id"], {"success": True})
     except InvalidGraph as err:
         connection.send_error(msg["id"], "invalid_graph", str(err))
@@ -111,6 +116,7 @@ def ws_delete_graph(
     loader = _get_loader(hass)
     try:
         loader.delete(msg["graph_id"])
+        hass.bus.async_fire(EVENT_GRAPH_DELETED, {"graph_id": msg["graph_id"]})
         connection.send_result(msg["id"], {"success": True})
     except GraphNotFound as err:
         connection.send_error(msg["id"], "graph_not_found", str(err))

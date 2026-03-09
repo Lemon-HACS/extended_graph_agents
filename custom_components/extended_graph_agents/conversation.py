@@ -15,20 +15,20 @@ from homeassistant.components.conversation import (
     ConversationResult,
     async_get_chat_log,
 )
-from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import MATCH_ALL
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback, Event
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, intent, llm
 from homeassistant.helpers.chat_session import async_get_chat_session
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
-    CONF_CHAT_MODEL,
-    CONF_GRAPH_ID,
     DEFAULT_CHAT_MODEL,
     DOMAIN,
     EVENT_GRAPH_EXECUTION_FINISHED,
+    EVENT_GRAPH_SAVED,
+    EVENT_GRAPH_DELETED,
+    GRAPHS_SUBDIR,
 )
 from .exceptions import GraphNotFound, GraphExecutionError
 from .graph_engine import GraphEngine, ExecutionEvent
@@ -44,14 +44,48 @@ async def async_setup_entry(
     config_entry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up graph conversation entities."""
-    for subentry in config_entry.subentries.values():
-        if subentry.subentry_type != "conversation":
-            continue
-        async_add_entities(
-            [GraphConversationEntity(config_entry, subentry)],
-            config_subentry_id=subentry.subentry_id,
-        )
+    """Set up graph conversation entities from saved graphs."""
+    graphs_dir = Path(hass.config.config_dir) / GRAPHS_SUBDIR
+    loader = GraphLoader(str(graphs_dir))
+
+    # Track active entities by graph_id
+    entities: dict[str, GraphConversationEntity] = {}
+
+    # Create entities for all existing graphs
+    initial = []
+    for graph in loader.load_all():
+        entity = GraphConversationEntity(config_entry, graph.id, graph.name)
+        entities[graph.id] = entity
+        initial.append(entity)
+    if initial:
+        async_add_entities(initial)
+
+    @callback
+    def handle_graph_saved(event: Event) -> None:
+        graph_id = event.data.get("graph_id")
+        graph_name = event.data.get("graph_name") or graph_id
+        if not graph_id:
+            return
+        if graph_id in entities:
+            entities[graph_id].update_name(graph_name)
+        else:
+            entity = GraphConversationEntity(config_entry, graph_id, graph_name)
+            entities[graph_id] = entity
+            async_add_entities([entity])
+
+    @callback
+    def handle_graph_deleted(event: Event) -> None:
+        graph_id = event.data.get("graph_id")
+        if graph_id and graph_id in entities:
+            entity = entities.pop(graph_id)
+            hass.async_create_task(entity.async_remove())
+
+    config_entry.async_on_unload(
+        hass.bus.async_listen(EVENT_GRAPH_SAVED, handle_graph_saved)
+    )
+    config_entry.async_on_unload(
+        hass.bus.async_listen(EVENT_GRAPH_DELETED, handle_graph_deleted)
+    )
 
 
 class GraphConversationEntity(
@@ -60,21 +94,19 @@ class GraphConversationEntity(
 ):
     """Graph-based conversation agent entity."""
 
-    _attr_has_entity_name = True
-    _attr_name = None
+    _attr_has_entity_name = False
     _attr_supports_streaming = False
     _attr_supported_features = ConversationEntityFeature.CONTROL
 
-    def __init__(self, entry, subentry: ConfigSubentry) -> None:
+    def __init__(self, entry, graph_id: str, graph_name: str) -> None:
         self.entry = entry
-        self.subentry = subentry
-        self._attr_unique_id = subentry.subentry_id
-        model = subentry.data.get(CONF_CHAT_MODEL, DEFAULT_CHAT_MODEL)
+        self.graph_id = graph_id
+        self._attr_unique_id = f"{DOMAIN}_{graph_id}"
+        self._attr_name = graph_name
         self._attr_device_info = dr.DeviceInfo(
-            identifiers={(DOMAIN, subentry.subentry_id)},
-            name=subentry.title,
+            identifiers={(DOMAIN, entry.entry_id)},
+            name="Extended Graph Agents",
             manufacturer="Extended Graph Agents",
-            model=model,
             entry_type=dr.DeviceEntryType.SERVICE,
         )
 
@@ -86,13 +118,9 @@ class GraphConversationEntity(
     def _client(self) -> AsyncClient:
         return self.entry.runtime_data
 
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        conversation.async_set_agent(self.hass, self.entry, self)
-
-    async def async_will_remove_from_hass(self) -> None:
-        conversation.async_unset_agent(self.hass, self.entry)
-        await super().async_will_remove_from_hass()
+    def update_name(self, new_name: str) -> None:
+        self._attr_name = new_name
+        self.async_write_ha_state()
 
     async def async_process(self, user_input: ConversationInput) -> ConversationResult:
         with (
@@ -104,12 +132,7 @@ class GraphConversationEntity(
     async def _handle_message(
         self, user_input: ConversationInput, chat_log: ChatLog
     ) -> ConversationResult:
-        graph_id = self.subentry.data.get(CONF_GRAPH_ID)
-        model = self.subentry.data.get(CONF_CHAT_MODEL, DEFAULT_CHAT_MODEL)
-        graphs_dir = (
-            Path(self.hass.config.config_dir) / "extended_graph_agents" / "graphs"
-        )
-
+        graphs_dir = Path(self.hass.config.config_dir) / GRAPHS_SUBDIR
         llm_context = user_input.as_llm_context(DOMAIN)
         exposed_entities = get_exposed_entities(self.hass)
 
@@ -125,18 +148,11 @@ class GraphConversationEntity(
 
         try:
             loader = GraphLoader(str(graphs_dir))
-            if not graph_id:
-                # Use first available graph
-                graph_ids = loader.list_ids()
-                if not graph_ids:
-                    raise GraphNotFound("(none)")
-                graph_id = graph_ids[0]
-
-            graph = loader.load_by_id(graph_id)
+            graph = loader.load_by_id(self.graph_id)
             engine = GraphEngine(
                 hass=self.hass,
                 client=self._client,
-                default_model=model,
+                default_model=graph.model,
                 event_callback=on_event,
             )
             response_text = await engine.execute(
@@ -147,7 +163,7 @@ class GraphConversationEntity(
             intent_response = intent.IntentResponse(language=user_input.language)
             intent_response.async_set_error(
                 intent.IntentResponseErrorCode.UNKNOWN,
-                f"Graph '{graph_id}' not found. Please create a graph first.",
+                f"Graph '{self.graph_id}' not found.",
             )
             return ConversationResult(
                 response=intent_response,
@@ -168,7 +184,7 @@ class GraphConversationEntity(
         self.hass.bus.async_fire(
             EVENT_GRAPH_EXECUTION_FINISHED,
             {
-                "graph_id": graph_id,
+                "graph_id": self.graph_id,
                 "user_input": user_input.text,
                 "trace": execution_trace,
             },
