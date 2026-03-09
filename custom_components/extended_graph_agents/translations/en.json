@@ -17,5 +17,18 @@
     "error": {
       "cannot_connect": "Cannot connect to the API. Please check your API key and Base URL."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Extended Graph Agents Options",
+        "data": {
+          "base_url": "Base URL"
+        },
+        "data_description": {
+          "base_url": "Defaults to the OpenAI API. Change this URL if you are using a compatible third-party API."
+        }
+      }
+    }
   }
 }

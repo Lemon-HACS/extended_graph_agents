@@ -17,5 +17,18 @@
     "error": {
       "cannot_connect": "API에 연결할 수 없습니다. API 키와 Base URL을 확인하세요."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Extended Graph Agents 옵션",
+        "data": {
+          "base_url": "Base URL"
+        },
+        "data_description": {
+          "base_url": "기본값은 OpenAI API입니다. 다른 호환 API를 사용하는 경우 URL을 변경하세요."
+        }
+      }
+    }
   }
 }
