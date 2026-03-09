@@ -47,13 +47,13 @@ class GraphEngine:
         llm_context: llm.LLMContext | None = None,
     ) -> str:
         """Execute the graph and return final response."""
-        # Start from first node
-        start_node_config = graph.get_start_node()
-
         # Apply default model to nodes that don't specify one
         for node_config in graph.nodes:
             if "model" not in node_config:
                 node_config["model"] = graph.model or self.default_model
+
+        # Start from input node if present, else first node
+        start_node_config = graph.get_start_node()
 
         steps = 0
         # Queue of (node_ids_to_execute, execution_mode)
@@ -80,19 +80,35 @@ class GraphEngine:
                 if result.next_node_ids:
                     pending.append((result.next_node_ids, result.execution_mode))
 
-        # Return last regular node output
-        final_output = ""
+        # Determine final output
+        return self._collect_final_output(graph, state)
+
+    def _collect_final_output(self, graph: GraphDefinition, state: GraphState) -> str:
+        """Determine the final output text from the executed graph."""
+        # 1. If there's an output node, use the node(s) that feed into it
+        output_node = graph.output_node
+        if output_node is not None:
+            input_from = output_node.get("input_from", [])
+            if isinstance(input_from, str):
+                input_from = [input_from]
+            for src_id in input_from:
+                if src_id in state.node_outputs:
+                    return state.node_outputs[src_id]
+            # If output node executed itself (e.g., routed to it)
+            if output_node["id"] in state.node_outputs:
+                return state.node_outputs[output_node["id"]]
+
+        # 2. Fallback: last regular node in reverse YAML order
         for node_config in reversed(graph.nodes):
             node_id = node_config["id"]
             if node_id in state.node_outputs and node_config.get("type") == "regular":
-                final_output = state.node_outputs[node_id]
-                break
+                return state.node_outputs[node_id]
 
-        # Fallback: return last output
-        if not final_output and state.node_outputs:
-            final_output = list(state.node_outputs.values())[-1]
+        # 3. Last resort: any last output
+        if state.node_outputs:
+            return list(state.node_outputs.values())[-1]
 
-        return final_output or "No response generated"
+        return "No response generated"
 
     async def _execute_single(
         self,

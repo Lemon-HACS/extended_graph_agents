@@ -48,7 +48,7 @@ interface GraphStore {
   setIsSaving: (saving: boolean) => void;
   newGraph: () => void;
   getCurrentGraphDef: () => GraphDefinition | null;
-  addNode: (type: "router" | "regular", position: { x: number; y: number }) => void;
+  addNode: (type: "input" | "router" | "regular" | "output", position: { x: number; y: number }) => void;
   updateGraphMeta: (meta: Partial<Pick<GraphDefinition, "name" | "description" | "model">>) => void;
 }
 
@@ -173,18 +173,34 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   addNode: (type, position) => {
     const id = `${type}_${Date.now()}`;
     get().addLog("info", `노드 추가: type=${type}, id=${id}, pos=(${Math.round(position.x)}, ${Math.round(position.y)})`);
+
+    const flowType =
+      type === "router" ? "routerNode"
+      : type === "input" ? "inputNode"
+      : type === "output" ? "outputNode"
+      : "regularNode";
+
+    const defaultName =
+      type === "router" ? "New Router"
+      : type === "input" ? "Input"
+      : type === "output" ? "Output"
+      : "New Agent";
+
+    const extraData =
+      type === "router" ? { output_key: "route", routes: [] }
+      : type === "input" ? { next: [] }
+      : type === "output" ? { input_from: [] }
+      : { functions: [], skills: [] };
+
     const newNode: Node = {
       id,
-      type: type === "router" ? "routerNode" : "regularNode",
+      type: flowType,
       position,
       data: {
         id,
         type,
-        name: type === "router" ? "New Router" : "New Agent",
-        prompt: "",
-        ...(type === "router"
-          ? { output_key: "route", routes: [] }
-          : { functions: [], skills: [] }),
+        name: defaultName,
+        ...extraData,
       },
     };
     set((state) => ({

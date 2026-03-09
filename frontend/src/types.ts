@@ -22,7 +22,7 @@ export interface FunctionTool {
 
 export interface GraphNode {
   id: string;
-  type: "router" | "regular";
+  type: "router" | "regular" | "input" | "output";
   name: string;
   model?: string;
   prompt?: string;
@@ -32,6 +32,10 @@ export interface GraphNode {
   // Regular specific
   functions?: FunctionTool[];
   skills?: string[];
+  // Input node specific
+  next?: string[];
+  // Output node specific
+  input_from?: string[];
   // UI position (not saved to YAML)
   position?: { x: number; y: number };
 }

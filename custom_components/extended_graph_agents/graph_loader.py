@@ -23,12 +23,22 @@ class GraphDefinition:
 
         self._validate()
 
+    @property
+    def input_node(self) -> dict[str, Any] | None:
+        return next((n for n in self.nodes if n.get("type") == "input"), None)
+
+    @property
+    def output_node(self) -> dict[str, Any] | None:
+        return next((n for n in self.nodes if n.get("type") == "output"), None)
+
     def _validate(self):
         if not self.id:
             raise InvalidGraph("Graph must have an 'id' field")
         if not self.nodes:
             raise InvalidGraph(f"Graph '{self.id}' has no nodes")
         node_ids = {n["id"] for n in self.nodes}
+        input_count = 0
+        output_count = 0
         for node in self.nodes:
             if "id" not in node:
                 raise InvalidGraph("All nodes must have an 'id' field")
@@ -41,13 +51,31 @@ class GraphDefinition:
                             raise InvalidGraph(
                                 f"Router '{node['id']}' references unknown node '{next_id}'"
                             )
+            elif node["type"] == "input":
+                input_count += 1
+                if input_count > 1:
+                    raise InvalidGraph(f"Graph '{self.id}' has more than one input node")
+                for next_id in (node.get("next") or []):
+                    if isinstance(next_id, str) and next_id not in node_ids:
+                        raise InvalidGraph(
+                            f"Input node references unknown node '{next_id}'"
+                        )
+            elif node["type"] == "output":
+                output_count += 1
+                if output_count > 1:
+                    raise InvalidGraph(f"Graph '{self.id}' has more than one output node")
+                for src_id in (node.get("input_from") or []):
+                    if isinstance(src_id, str) and src_id not in node_ids:
+                        raise InvalidGraph(
+                            f"Output node input_from references unknown node '{src_id}'"
+                        )
 
     def get_node(self, node_id: str) -> dict[str, Any] | None:
         return next((n for n in self.nodes if n["id"] == node_id), None)
 
     def get_start_node(self) -> dict[str, Any]:
-        """Return first node as start."""
-        return self.nodes[0]
+        """Return input node if exists, else first node."""
+        return self.input_node or self.nodes[0]
 
     def to_dict(self) -> dict[str, Any]:
         return self._raw

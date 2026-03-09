@@ -2,10 +2,14 @@
 from .base import BaseNode, NodeResult
 from .router import RouterNode
 from .regular import RegularNode
+from .input import InputNode
+from .output import OutputNode
 
 _NODE_REGISTRY = {
     "router": RouterNode,
     "regular": RegularNode,
+    "input": InputNode,
+    "output": OutputNode,
 }
 
 

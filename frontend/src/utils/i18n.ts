@@ -10,8 +10,10 @@ const en = {
   noGraphSelected: "No graph selected",
   selectOrCreate: "Select a graph from the sidebar or create a new one",
   dragToAdd: "DRAG TO ADD",
+  inputNode: "Input",
   router: "Router",
   agent: "Agent",
+  outputNode: "Output",
 
   // App topbar
   graphLabel: "Graph:",
@@ -65,8 +67,10 @@ const ko: typeof en = {
   noGraphSelected: "그래프가 선택되지 않았습니다",
   selectOrCreate: "사이드바에서 그래프를 선택하거나 새로 만드세요",
   dragToAdd: "드래그하여 추가",
+  inputNode: "입력",
   router: "라우터",
   agent: "에이전트",
+  outputNode: "출력",
 
   // App topbar
   graphLabel: "그래프:",

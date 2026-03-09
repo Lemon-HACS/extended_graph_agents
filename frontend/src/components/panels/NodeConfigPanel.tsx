@@ -62,7 +62,10 @@ export function NodeConfigPanel({ onClose, isMobile, panelWidth = 380 }: NodeCon
       >
         <div>
           <div style={{ color: "#94a3b8", fontSize: 11, marginBottom: 2 }}>
-            {data.type === "router" ? "🔀 ROUTER" : "🤖 AGENT"}
+            {data.type === "router" ? "🔀 ROUTER"
+              : data.type === "input" ? "💬 INPUT"
+              : data.type === "output" ? "📤 OUTPUT"
+              : "🤖 AGENT"}
           </div>
           <div style={{ color: "white", fontWeight: 600 }}>{t.nodeConfig}</div>
         </div>
@@ -83,45 +86,71 @@ export function NodeConfigPanel({ onClose, isMobile, panelWidth = 380 }: NodeCon
 
       {/* Scrollable content */}
       <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-        {/* Common fields */}
-        <Field label={t.nodeId}>
-          <input value={data.id} readOnly style={inputStyle} />
-        </Field>
-
-        <Field label={t.name}>
-          <input
-            value={data.name ?? ""}
-            onChange={(e) => update("name", e.target.value)}
-            style={inputStyle}
-          />
-        </Field>
-
-        <Field label={t.modelOptional}>
-          <input
-            value={data.model ?? ""}
-            onChange={(e) => update("model", e.target.value || undefined)}
-            placeholder={t.modelPlaceholder}
-            style={inputStyle}
-          />
-        </Field>
-
-        <Field label={t.systemPrompt}>
-          <textarea
-            value={data.prompt ?? ""}
-            onChange={(e) => update("prompt", e.target.value)}
-            rows={6}
-            style={{ ...inputStyle, fontFamily: "monospace", resize: "vertical" }}
-          />
-        </Field>
-
-        {/* Router-specific */}
-        {data.type === "router" && (
-          <RouterConfig data={data} update={update} />
+        {/* Input/Output nodes: minimal config */}
+        {(data.type === "input" || data.type === "output") && (
+          <>
+            <Field label={t.nodeId}>
+              <input value={data.id} readOnly style={inputStyle} />
+            </Field>
+            <div
+              style={{
+                marginTop: 8,
+                padding: 12,
+                background: "rgba(255,255,255,0.04)",
+                borderRadius: 8,
+                color: "#64748b",
+                fontSize: 12,
+                lineHeight: 1.6,
+              }}
+            >
+              {data.type === "input"
+                ? "사용자 메시지가 여기서 시작됩니다.\n연결된 노드에서 {{ user_input }}으로 접근할 수 있습니다."
+                : "연결된 노드의 출력이 대화 에이전트 응답으로 반환됩니다."}
+            </div>
+          </>
         )}
 
-        {/* Regular-specific */}
-        {data.type === "regular" && (
-          <RegularConfig data={data} update={update} />
+        {/* Router / Regular: full config */}
+        {(data.type === "router" || data.type === "regular") && (
+          <>
+            <Field label={t.nodeId}>
+              <input value={data.id} readOnly style={inputStyle} />
+            </Field>
+
+            <Field label={t.name}>
+              <input
+                value={data.name ?? ""}
+                onChange={(e) => update("name", e.target.value)}
+                style={inputStyle}
+              />
+            </Field>
+
+            <Field label={t.modelOptional}>
+              <input
+                value={data.model ?? ""}
+                onChange={(e) => update("model", e.target.value || undefined)}
+                placeholder={t.modelPlaceholder}
+                style={inputStyle}
+              />
+            </Field>
+
+            <Field label={t.systemPrompt}>
+              <textarea
+                value={data.prompt ?? ""}
+                onChange={(e) => update("prompt", e.target.value)}
+                rows={6}
+                style={{ ...inputStyle, fontFamily: "monospace", resize: "vertical" }}
+              />
+            </Field>
+
+            {data.type === "router" && (
+              <RouterConfig data={data} update={update} />
+            )}
+
+            {data.type === "regular" && (
+              <RegularConfig data={data} update={update} />
+            )}
+          </>
         )}
       </div>
     </div>

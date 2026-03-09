@@ -25,7 +25,14 @@ export function graphToFlow(
 
   const flowNodes: Node[] = graph.nodes.map((node) => ({
     id: node.id,
-    type: node.type === "router" ? "routerNode" : "regularNode",
+    type:
+      node.type === "router"
+        ? "routerNode"
+        : node.type === "input"
+          ? "inputNode"
+          : node.type === "output"
+            ? "outputNode"
+            : "regularNode",
     position:
       savedPositions?.[node.id] ??
       autoPositions.get(node.id) ?? { x: 0, y: 0 },
@@ -33,7 +40,9 @@ export function graphToFlow(
   }));
 
   const flowEdges: Edge[] = [];
+
   graph.nodes.forEach((node) => {
+    // Router → next nodes (via routes)
     if (node.type === "router" && node.routes) {
       node.routes.forEach((route, routeIdx) => {
         (route.next ?? []).forEach((targetId, targetIdx) => {
@@ -42,18 +51,42 @@ export function graphToFlow(
             source: node.id,
             target: targetId,
             type: "conditionalEdge",
-            label:
-              route.match === "*" ? "default" : String(route.match),
+            label: route.match === "*" ? "default" : String(route.match),
             data: {
               match: route.match,
               mode: route.mode ?? "sequential",
             },
             animated: route.mode === "parallel",
             style: {
-              strokeDasharray:
-                route.mode === "parallel" ? "5,5" : undefined,
+              strokeDasharray: route.mode === "parallel" ? "5,5" : undefined,
             },
           });
+        });
+      });
+    }
+
+    // Input node → next nodes
+    if (node.type === "input" && node.next) {
+      node.next.forEach((targetId, idx) => {
+        flowEdges.push({
+          id: `${node.id}->${targetId}-i${idx}`,
+          source: node.id,
+          target: targetId,
+          type: "conditionalEdge",
+          data: { match: "*", mode: "sequential" },
+        });
+      });
+    }
+
+    // Output node ← input_from nodes
+    if (node.type === "output" && node.input_from) {
+      node.input_from.forEach((sourceId, idx) => {
+        flowEdges.push({
+          id: `${sourceId}->${node.id}-o${idx}`,
+          source: sourceId,
+          target: node.id,
+          type: "conditionalEdge",
+          data: { match: "*", mode: "sequential" },
         });
       });
     }
@@ -67,13 +100,28 @@ export function flowToGraph(
   flowNodes: Node[],
   flowEdges: Edge[]
 ): GraphDefinition {
-  // Rebuild edges into router routes
+  // Collect outgoing edges per source node
+  const outgoingEdges: Record<string, string[]> = {};
+  // Collect incoming edges per target node
+  const incomingEdges: Record<string, string[]> = {};
+
+  flowEdges.forEach((edge) => {
+    if (!outgoingEdges[edge.source]) outgoingEdges[edge.source] = [];
+    outgoingEdges[edge.source].push(edge.target);
+    if (!incomingEdges[edge.target]) incomingEdges[edge.target] = [];
+    incomingEdges[edge.target].push(edge.source);
+  });
+
+  // Rebuild router routes from edges
   const routerEdges: Record<
     string,
     Array<{ match: string; targets: string[]; mode: string }>
   > = {};
 
   flowEdges.forEach((edge) => {
+    const sourceNode = flowNodes.find((n) => n.id === edge.source);
+    if (sourceNode?.type !== "routerNode") return;
+
     const match = (edge.data?.match as string) ?? "*";
     const mode = (edge.data?.mode as string) ?? "sequential";
 
@@ -94,13 +142,25 @@ export function flowToGraph(
     nodeData.id = n.id;
 
     if (nodeData.type === "router") {
-      // Rebuild routes from edges
       const edgeRoutes = routerEdges[n.id] ?? [];
       nodeData.routes = edgeRoutes.map((r) => ({
         match: r.match,
         next: r.targets,
         mode: r.mode as "sequential" | "parallel",
       }));
+    } else if (nodeData.type === "input") {
+      // Save outgoing edges as `next`
+      const targets = outgoingEdges[n.id] ?? [];
+      // Exclude output nodes from next (output node handles its own input_from)
+      nodeData.next = targets.filter((targetId) => {
+        const targetNode = flowNodes.find((fn) => fn.id === targetId);
+        return targetNode?.type !== "outputNode";
+      });
+    } else if (nodeData.type === "output") {
+      // Save incoming edges as `input_from`
+      nodeData.input_from = incomingEdges[n.id] ?? [];
+      // Remove `next` field if present
+      delete nodeData.next;
     }
 
     return nodeData;

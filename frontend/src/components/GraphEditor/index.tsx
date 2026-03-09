@@ -17,12 +17,16 @@ import type { Connection, NodeChange, EdgeChange } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { RouterNode } from "../nodes/RouterNode";
 import { RegularNode } from "../nodes/RegularNode";
+import { InputNode } from "../nodes/InputNode";
+import { OutputNode } from "../nodes/OutputNode";
 import { ConditionalEdge } from "../edges/ConditionalEdge";
 import { useGraphStore } from "../../store/graphStore";
 
 const nodeTypes = {
   routerNode: RouterNode,
   regularNode: RegularNode,
+  inputNode: InputNode,
+  outputNode: OutputNode,
 };
 
 const edgeTypes = {
@@ -36,7 +40,7 @@ const defaultEdgeOptions = {
 
 // ReactFlow Panel 내부에서 React 합성 dragStart 이벤트가 안 먹히므로
 // 모듈 레벨 변수로 드래그 타입을 추적
-let _draggedNodeType: "router" | "regular" | null = null;
+let _draggedNodeType: "input" | "router" | "regular" | "output" | null = null;
 
 interface GraphEditorProps {
   onNodeClick: (nodeId: string) => void;
@@ -187,16 +191,20 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
 function NodePalette() {
   const { addLog } = useGraphStore();
   const t = useLang();
+  const inputRef = useRef<HTMLDivElement>(null);
   const routerRef = useRef<HTMLDivElement>(null);
   const agentRef = useRef<HTMLDivElement>(null);
+  const outputRef = useRef<HTMLDivElement>(null);
 
   // ReactFlow Panel 내부에서 React onDragStart가 안 먹히므로
   // native addEventListener로 직접 등록
   useEffect(() => {
+    const inputEl = inputRef.current;
     const routerEl = routerRef.current;
     const agentEl = agentRef.current;
+    const outputEl = outputRef.current;
 
-    const makeDragStart = (type: "router" | "regular") => (e: DragEvent) => {
+    const makeDragStart = (type: "input" | "router" | "regular" | "output") => (e: DragEvent) => {
       _draggedNodeType = type;
       if (e.dataTransfer) {
         e.dataTransfer.setData("nodeType", type);
@@ -212,21 +220,23 @@ function NodePalette() {
       );
     };
 
-    const routerDragStart = makeDragStart("router");
-    const routerDragEnd = makeDragEnd("router");
-    const agentDragStart = makeDragStart("regular");
-    const agentDragEnd = makeDragEnd("regular");
+    const listeners = [
+      { el: inputEl, start: makeDragStart("input"), end: makeDragEnd("input") },
+      { el: routerEl, start: makeDragStart("router"), end: makeDragEnd("router") },
+      { el: agentEl, start: makeDragStart("regular"), end: makeDragEnd("regular") },
+      { el: outputEl, start: makeDragStart("output"), end: makeDragEnd("output") },
+    ];
 
-    routerEl?.addEventListener("dragstart", routerDragStart);
-    routerEl?.addEventListener("dragend", routerDragEnd);
-    agentEl?.addEventListener("dragstart", agentDragStart);
-    agentEl?.addEventListener("dragend", agentDragEnd);
+    listeners.forEach(({ el, start, end }) => {
+      el?.addEventListener("dragstart", start);
+      el?.addEventListener("dragend", end);
+    });
 
     return () => {
-      routerEl?.removeEventListener("dragstart", routerDragStart);
-      routerEl?.removeEventListener("dragend", routerDragEnd);
-      agentEl?.removeEventListener("dragstart", agentDragStart);
-      agentEl?.removeEventListener("dragend", agentDragEnd);
+      listeners.forEach(({ el, start, end }) => {
+        el?.removeEventListener("dragstart", start);
+        el?.removeEventListener("dragend", end);
+      });
     };
   }, [addLog]);
 
@@ -260,11 +270,17 @@ function NodePalette() {
       <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>
         {t.dragToAdd}
       </div>
+      <div ref={inputRef} draggable style={paletteItemStyle("#1e1150", "#7c3aed")}>
+        💬 {t.inputNode}
+      </div>
       <div ref={routerRef} draggable style={paletteItemStyle("#1a3050", "#3b82f6")}>
         🔀 {t.router}
       </div>
       <div ref={agentRef} draggable style={paletteItemStyle("#162d16", "#22c55e")}>
         🤖 {t.agent}
+      </div>
+      <div ref={outputRef} draggable style={paletteItemStyle("#2c1a02", "#c2410c")}>
+        📤 {t.outputNode}
       </div>
     </div>
   );
