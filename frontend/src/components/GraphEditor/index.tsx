@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef, useEffect } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -32,6 +32,10 @@ const defaultEdgeOptions = {
   type: "conditionalEdge",
   data: { match: "*", mode: "sequential" },
 };
+
+// ReactFlow Panel 내부에서 React 합성 dragStart 이벤트가 안 먹히므로
+// 모듈 레벨 변수로 드래그 타입을 추적
+let _draggedNodeType: "router" | "regular" | null = null;
 
 interface GraphEditorProps {
   onNodeClick: (nodeId: string) => void;
@@ -122,12 +126,12 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
-      const types = Array.from(event.dataTransfer.types);
-      const type = event.dataTransfer.getData("nodeType") as "router" | "regular";
+      const type = _draggedNodeType;
+      _draggedNodeType = null;
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       addLog(
         type ? "info" : "warn",
-        `[drop] nodeType="${type || "(없음)"}" | dataTransfer.types=[${types.join(",")}] | screen=(${event.clientX},${event.clientY}) | flow=(${Math.round(position.x)},${Math.round(position.y)}) | target=${(event.target as HTMLElement).tagName}.${(event.target as HTMLElement).className.toString().slice(0,40)}`
+        `[drop] nodeType="${type || "(없음)"}" | screen=(${event.clientX},${event.clientY}) | flow=(${Math.round(position.x)},${Math.round(position.y)})`
       );
       if (!type) return;
       addNode(type, position);
@@ -143,8 +147,6 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
   return (
     <div
       style={{ flex: 1, position: "relative", height: "100%", minHeight: 0 }}
-      onDrop={onDrop}
-      onDragOver={onDragOver}
     >
       <ReactFlow
         nodes={flowNodes}
@@ -152,6 +154,8 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
         onNodeClick={(_, node) => onNodeClick(node.id)}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
@@ -180,19 +184,62 @@ function GraphEditorInner({ onNodeClick }: GraphEditorProps) {
 
 function NodePalette() {
   const { addLog } = useGraphStore();
+  const routerRef = useRef<HTMLDivElement>(null);
+  const agentRef = useRef<HTMLDivElement>(null);
 
-  const onDragStart = (e: React.DragEvent, type: string) => {
-    e.dataTransfer.setData("nodeType", type);
-    e.dataTransfer.effectAllowed = "move";
-    addLog("info", `[dragstart] type="${type}" | effectAllowed=${e.dataTransfer.effectAllowed}`);
-  };
+  // ReactFlow Panel 내부에서 React onDragStart가 안 먹히므로
+  // native addEventListener로 직접 등록
+  useEffect(() => {
+    const routerEl = routerRef.current;
+    const agentEl = agentRef.current;
 
-  const onDragEnd = (e: React.DragEvent, type: string) => {
-    addLog(
-      e.dataTransfer.dropEffect === "none" ? "warn" : "info",
-      `[dragend] type="${type}" | dropEffect="${e.dataTransfer.dropEffect}" (none=드롭 실패)`
-    );
-  };
+    const makeDragStart = (type: "router" | "regular") => (e: DragEvent) => {
+      _draggedNodeType = type;
+      if (e.dataTransfer) {
+        e.dataTransfer.setData("nodeType", type);
+        e.dataTransfer.effectAllowed = "move";
+      }
+      addLog("info", `[dragstart] type="${type}"`);
+    };
+
+    const makeDragEnd = (type: string) => (e: DragEvent) => {
+      addLog(
+        e.dataTransfer?.dropEffect === "none" ? "warn" : "info",
+        `[dragend] type="${type}" | dropEffect="${e.dataTransfer?.dropEffect}" (none=드롭 실패)`
+      );
+    };
+
+    const routerDragStart = makeDragStart("router");
+    const routerDragEnd = makeDragEnd("router");
+    const agentDragStart = makeDragStart("regular");
+    const agentDragEnd = makeDragEnd("regular");
+
+    routerEl?.addEventListener("dragstart", routerDragStart);
+    routerEl?.addEventListener("dragend", routerDragEnd);
+    agentEl?.addEventListener("dragstart", agentDragStart);
+    agentEl?.addEventListener("dragend", agentDragEnd);
+
+    return () => {
+      routerEl?.removeEventListener("dragstart", routerDragStart);
+      routerEl?.removeEventListener("dragend", routerDragEnd);
+      agentEl?.removeEventListener("dragstart", agentDragStart);
+      agentEl?.removeEventListener("dragend", agentDragEnd);
+    };
+  }, [addLog]);
+
+  const paletteItemStyle = (bg: string, border: string): React.CSSProperties => ({
+    background: bg,
+    border: `1px solid ${border}`,
+    borderRadius: 6,
+    padding: "8px 14px",
+    cursor: "grab",
+    color: "white",
+    fontSize: 12,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    userSelect: "none",
+  });
 
   return (
     <div
@@ -210,44 +257,10 @@ function NodePalette() {
       <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>
         DRAG TO ADD
       </div>
-      <div
-        draggable
-        onDragStart={(e) => onDragStart(e, "router")}
-        onDragEnd={(e) => onDragEnd(e, "router")}
-        style={{
-          background: "#1a3050",
-          border: "1px solid #3b82f6",
-          borderRadius: 6,
-          padding: "8px 14px",
-          cursor: "grab",
-          color: "white",
-          fontSize: 12,
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          userSelect: "none",
-        }}
-      >
+      <div ref={routerRef} draggable style={paletteItemStyle("#1a3050", "#3b82f6")}>
         🔀 Router
       </div>
-      <div
-        draggable
-        onDragStart={(e) => onDragStart(e, "regular")}
-        onDragEnd={(e) => onDragEnd(e, "regular")}
-        style={{
-          background: "#162d16",
-          border: "1px solid #22c55e",
-          borderRadius: 6,
-          padding: "8px 14px",
-          cursor: "grab",
-          color: "white",
-          fontSize: 12,
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          userSelect: "none",
-        }}
-      >
+      <div ref={agentRef} draggable style={paletteItemStyle("#162d16", "#22c55e")}>
         🤖 Agent
       </div>
     </div>

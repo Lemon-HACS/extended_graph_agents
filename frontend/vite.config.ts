@@ -4,7 +4,16 @@ import cssInjectedByJsPlugin from "vite-plugin-css-injected-by-js";
 import { resolve } from "path";
 
 export default defineConfig({
-  plugins: [react(), cssInjectedByJsPlugin()],
+  plugins: [
+    react(),
+    cssInjectedByJsPlugin({
+      // Store CSS in a global variable instead of injecting into document.head.
+      // HA panels live inside shadow DOM, so document.head styles don't reach them.
+      injectCode: (cssCode: string) => {
+        return `try{if(typeof document<"u"){window.__EXTENDED_GRAPH_AGENTS_CSS__=${cssCode}}}catch(e){console.error("css-inject",e)}`;
+      },
+    }),
+  ],
   build: {
     lib: {
       entry: resolve(__dirname, "src/main.tsx"),
