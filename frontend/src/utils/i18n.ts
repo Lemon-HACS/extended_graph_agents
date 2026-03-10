@@ -51,6 +51,14 @@ const en = {
   functionType: "Function Type",
   functionConfig: "Function Config (JSON)",
 
+  // PromptField (template helpers)
+  jinjaHint: "Jinja2 supported: {{ states('sensor.x') }}, {{ variables.key }}, {{ user_input }}, {{ node_outputs.node_id.key }}",
+  insertEntity: "Insert Entity",
+  previewPrompt: "Preview",
+  previewResult: "Preview Result",
+  previewError: "Template Error",
+  entitySearch: "Search entities...",
+
   // EdgeConfigPanel
   edgeConfig: "Edge Config",
   edgeFrom: "From",
@@ -177,6 +185,14 @@ const ko: typeof en = {
   description: "설명",
   functionType: "함수 유형",
   functionConfig: "함수 설정 (JSON)",
+
+  // PromptField (template helpers)
+  jinjaHint: "Jinja2 사용 가능: {{ states('sensor.x') }}, {{ variables.키 }}, {{ user_input }}, {{ node_outputs.노드id.키 }}",
+  insertEntity: "엔티티 삽입",
+  previewPrompt: "미리보기",
+  previewResult: "미리보기 결과",
+  previewError: "템플릿 오류",
+  entitySearch: "엔티티 검색...",
 
   // EdgeConfigPanel
   edgeConfig: "엣지 설정",

@@ -72,3 +72,24 @@ export async function deleteSkill(conn: HassConnection, skillId: string) {
     skill_id: skillId,
   });
 }
+
+export async function renderTemplate(conn: HassConnection, template: string): Promise<string> {
+  const result = (await conn.sendMessagePromise({
+    type: `${DOMAIN}/render_template`,
+    template,
+  })) as { result: string };
+  return result.result;
+}
+
+export interface HassEntityState {
+  entity_id: string;
+  state: string;
+  attributes: Record<string, unknown>;
+}
+
+export async function getStates(conn: HassConnection): Promise<HassEntityState[]> {
+  const result = (await conn.sendMessagePromise({
+    type: "get_states",
+  })) as HassEntityState[];
+  return result;
+}

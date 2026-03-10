@@ -352,6 +352,7 @@ export function App({ hass }: AppProps) {
 
           {selectedNodeId && !showYaml && (
             <NodeConfigPanel
+              conn={conn}
               onClose={() => selectNode(null)}
               isMobile={isMobile}
               panelWidth={panelWidth}

@@ -24,6 +24,7 @@ def async_setup_websocket_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_get_skill)
     websocket_api.async_register_command(hass, ws_save_skill)
     websocket_api.async_register_command(hass, ws_delete_skill)
+    websocket_api.async_register_command(hass, ws_render_template)
 
 
 def _get_skill_loader(hass: HomeAssistant) -> SkillLoader:
@@ -207,6 +208,29 @@ def ws_save_skill(
         connection.send_error(msg["id"], "invalid_skill", str(err))
     except Exception as err:
         connection.send_error(msg["id"], "save_failed", str(err))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/render_template",
+    vol.Required("template"): str,
+})
+@callback
+def ws_render_template(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    from homeassistant.helpers import template as tmpl
+
+    try:
+        result = tmpl.Template(msg["template"], hass).async_render(
+            {"user_input": "(preview)", "language": "en", "variables": {}, "node_outputs": {}},
+            parse_result=False,
+        )
+        connection.send_result(msg["id"], {"result": str(result)})
+    except Exception as err:
+        connection.send_error(msg["id"], "render_error", str(err))
 
 
 @websocket_api.require_admin
