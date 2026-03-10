@@ -57,6 +57,13 @@ HA 사이드바의 **Graph Agents** 패널로 이동 후 **+ 새 그래프** 클
 
 노드 우측의 **핸들(작은 점)**을 드래그하여 다음 노드와 연결합니다.
 
+**엣지(연결선) 종류:**
+
+| 엣지 스타일 | 의미 |
+|------------|------|
+| 파란/노란 실선 + 라벨 | 라우터 → 다음 노드 (match 값 표시) |
+| 회색 점선 | 일반 노드 → 다음 노드 (Fan-in 연결) |
+
 ### 4단계: 노드 설정
 
 노드를 클릭하면 우측에 설정 패널이 열립니다.
@@ -450,6 +457,72 @@ nodes:
 
 ---
 
+## Fan-in (병렬 브랜치 합류)
+
+병렬로 실행된 여러 에이전트의 결과를 **하나의 노드에서 합치는** 패턴입니다.
+
+### 동작 원리
+
+```
+Router → [AgentA, AgentB]  병렬 실행
+  AgentA ─┐
+           ├─→ MergeAgent  한 번만 실행 (join/barrier)
+  AgentB ─┘
+```
+
+- Router가 `mode: parallel`로 `AgentA`, `AgentB`를 동시에 실행합니다.
+- 각 에이전트 노드에서 **일반 노드 → MergeAgent** 방향으로 엣지를 연결합니다.
+- 두 에이전트가 모두 완료된 후, `MergeAgent`가 **한 번만** 실행됩니다.
+- `MergeAgent`의 프롬프트에서 `{{ node_outputs.AgentA }}`와 `{{ node_outputs.AgentB }}`로 두 결과를 모두 참조할 수 있습니다.
+
+### UI에서 연결하기
+
+1. Router 노드에서 AgentA, AgentB로 엣지 연결 → 라우트 설정에서 `mode: parallel` 선택
+2. AgentA 노드 우측 핸들에서 MergeAgent로 드래그 (회색 점선 엣지로 표시됨)
+3. AgentB 노드 우측 핸들에서 MergeAgent로 드래그 (회색 점선 엣지로 표시됨)
+
+### YAML 예시
+
+```yaml
+nodes:
+  - id: dispatcher
+    type: router
+    prompt: "항상 'go'를 반환하세요."
+    output_key: task
+    routes:
+      - match: "*"
+        next: [agent_a, agent_b]
+        mode: parallel    # 두 노드 동시 실행
+
+  - id: agent_a
+    type: regular
+    name: 에이전트 A
+    prompt: "A 관점에서 분석하세요: {{ user_input }}"
+    next: [merger]        # Fan-in 대상 지정
+    functions: []
+
+  - id: agent_b
+    type: regular
+    name: 에이전트 B
+    prompt: "B 관점에서 분석하세요: {{ user_input }}"
+    next: [merger]        # 동일한 합류 노드를 가리킴
+    functions: []
+
+  - id: merger
+    type: regular
+    name: 결과 종합
+    prompt: |
+      두 에이전트의 분석을 종합하세요.
+      A의 분석: {{ node_outputs.agent_a }}
+      B의 분석: {{ node_outputs.agent_b }}
+    functions: []
+```
+
+> **주의**: 여러 병렬 브랜치가 같은 노드를 가리키면 해당 노드는 **한 번만** 실행됩니다.
+> 모든 병렬 브랜치 완료 후 `state.node_outputs`에 전체 결과가 누적되므로, 합류 노드에서 자유롭게 참조할 수 있습니다.
+
+---
+
 ## 대화 에이전트로 사용하기
 
 그래프를 저장하면 자동으로 HA 대화 에이전트로 등록됩니다.
@@ -484,6 +557,25 @@ npm run build
 ---
 
 ## 변경 이력
+
+### v1.0.28
+- **Fan-in 엣지 UI 개선**: 엣지(연결선) 종류를 시각적으로 구분
+  - 라우터 출발 엣지: 파란/노란 실선 + match 라벨 (기존 동작 유지)
+  - 일반 노드 출발 엣지 (Fan-in): 회색 점선, 라벨 없음
+
+### v1.0.27
+- **Fan-in (Join/Barrier) 로직 구현**: 병렬 브랜치가 같은 노드를 가리키면 한 번만 실행
+  - 일반 에이전트 노드에서 다음 노드(`next`) 지정 가능
+  - 여러 병렬 브랜치 완료 후 합류 노드가 모든 결과를 컨텍스트로 받아 실행
+
+### v1.0.26
+- 노드 삭제 버튼 및 `Delete` 키 단축키 추가
+
+### v1.0.25
+- Add Data Field 버그 수정 및 함수 에디터 번역 보완
+
+### v1.0.24
+- 함수 에디터 한글 i18n 및 사용 가이드 추가
 
 ### v1.0.23
 - **함수 비주얼 에디터**: JSON 직접 편집 대신 타입별 폼 UI 제공
