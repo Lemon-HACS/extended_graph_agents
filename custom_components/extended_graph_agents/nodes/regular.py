@@ -93,12 +93,43 @@ class RegularNode(BaseNode):
                     "function": func_tool["spec"],
                 })
 
+        # JSON output schema (structured output mode)
+        output_schema = config.get("output_schema", [])
+        json_schema_format = None
+        if output_schema:
+            properties = {}
+            required_fields = []
+            for field in output_schema:
+                prop: dict[str, Any] = {"type": field["type"]}
+                if field.get("description"):
+                    prop["description"] = field["description"]
+                if field.get("enum"):
+                    prop["enum"] = field["enum"]
+                properties[field["key"]] = prop
+                required_fields.append(field["key"])
+            json_schema_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "node_output",
+                    "strict": True,
+                    "schema": {
+                        "type": "object",
+                        "properties": properties,
+                        "required": required_fields,
+                        "additionalProperties": False,
+                    },
+                },
+            }
+
         # LLM call loop with tool execution
         api_kwargs: dict[str, Any] = {
             "model": model,
             "messages": messages,
         }
-        if tools:
+        if json_schema_format:
+            # Structured output mode: disable tools to avoid conflicts
+            api_kwargs["response_format"] = json_schema_format
+        elif tools:
             api_kwargs["tools"] = tools
             api_kwargs["tool_choice"] = "auto"
 
@@ -174,7 +205,24 @@ class RegularNode(BaseNode):
         # Store result in state
         state.node_outputs[self.node_id] = final_response
 
+        # If JSON mode, parse output and store each key as "{node_id}.{key}" in state
+        variables_set: dict[str, Any] = {}
+        if output_schema and final_response:
+            try:
+                output_data = json.loads(final_response)
+                for key, value in output_data.items():
+                    var_key = f"{self.node_id}.{key}"
+                    state.set(var_key, value)
+                    variables_set[var_key] = value
+            except json.JSONDecodeError:
+                _LOGGER.warning(
+                    "Node '%s' JSON output could not be parsed: %s",
+                    self.node_id,
+                    final_response[:200],
+                )
+
         return NodeResult(
             node_id=self.node_id,
             output=final_response,
+            variables_set=variables_set,
         )

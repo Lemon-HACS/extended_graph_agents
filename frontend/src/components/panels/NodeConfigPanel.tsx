@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { useGraphStore } from "../../store/graphStore";
 import { useSkillStore } from "../../store/skillStore";
 import { useLang } from "../../contexts/LangContext";
-import type { GraphNode, FunctionTool } from "../../types";
+import type { GraphNode, FunctionTool, OutputSchemaField } from "../../types";
 import { FunctionEditor, Field, inputStyle, addBtnStyle } from "../shared/FunctionEditor";
 import { renderTemplate, getStates, type HassConnection, type HassEntityState } from "../../utils/haApi";
 
@@ -267,6 +267,99 @@ function RouterConfig({
   );
 }
 
+function OutputSchemaEditor({
+  schema,
+  onChange,
+}: {
+  schema: OutputSchemaField[];
+  onChange: (s: OutputSchemaField[]) => void;
+}) {
+  const t = useLang();
+
+  const addField = () =>
+    onChange([...schema, { key: "", type: "string", description: "", enum: [] }]);
+
+  const updateField = (i: number, patch: Partial<OutputSchemaField>) =>
+    onChange(schema.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
+
+  const removeField = (i: number) => onChange(schema.filter((_, idx) => idx !== i));
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
+        {t.outputSchema}
+      </div>
+      {schema.map((field, i) => (
+        <div
+          key={i}
+          style={{
+            background: "#1e293b",
+            borderRadius: 8,
+            padding: 10,
+            marginBottom: 8,
+          }}
+        >
+          <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+            <input
+              value={field.key}
+              onChange={(e) => updateField(i, { key: e.target.value })}
+              placeholder={t.schemaFieldKey}
+              style={{ ...inputStyle, flex: 2 }}
+            />
+            <select
+              value={field.type}
+              onChange={(e) =>
+                updateField(i, { type: e.target.value as OutputSchemaField["type"] })
+              }
+              style={{ ...inputStyle, flex: 1 }}
+            >
+              <option value="string">string</option>
+              <option value="number">number</option>
+              <option value="integer">integer</option>
+              <option value="boolean">boolean</option>
+            </select>
+            <button
+              onClick={() => removeField(i)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#ef4444",
+                cursor: "pointer",
+                fontSize: 14,
+                flexShrink: 0,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+          <input
+            value={field.description ?? ""}
+            onChange={(e) => updateField(i, { description: e.target.value })}
+            placeholder={t.schemaFieldDesc}
+            style={{ ...inputStyle, marginBottom: 4 }}
+          />
+          <input
+            value={(field.enum ?? []).join(", ")}
+            onChange={(e) =>
+              updateField(i, {
+                enum: e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              })
+            }
+            placeholder={t.schemaFieldEnum}
+            style={inputStyle}
+          />
+        </div>
+      ))}
+      <button onClick={addField} style={addBtnStyle}>
+        {t.addSchemaField}
+      </button>
+    </div>
+  );
+}
+
 function RegularConfig({
   data,
   update,
@@ -277,6 +370,16 @@ function RegularConfig({
   const t = useLang();
   const functions = data.functions ?? [];
   const skills = data.skills ?? [];
+  const outputSchema = data.output_schema ?? [];
+  const jsonModeEnabled = outputSchema.length > 0;
+
+  const toggleJsonMode = () => {
+    if (jsonModeEnabled) {
+      update("output_schema", []);
+    } else {
+      update("output_schema", [{ key: "result", type: "string", description: "", enum: [] }]);
+    }
+  };
 
   const addFunction = () => {
     const newFunc: FunctionTool = {
@@ -314,40 +417,74 @@ function RegularConfig({
 
   return (
     <div>
-      <div style={{ marginTop: 16 }}>
-        <div
-          style={{
-            color: "#94a3b8",
-            fontSize: 12,
-            marginBottom: 8,
-            fontWeight: 600,
-          }}
-        >
-          {t.functions}
+      {/* JSON Output Mode toggle */}
+      <div
+        style={{
+          marginTop: 16,
+          padding: 12,
+          background: jsonModeEnabled ? "#0a1f0a" : "#1e293b",
+          border: `1px solid ${jsonModeEnabled ? "#22c55e" : "#334155"}`,
+          borderRadius: 8,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ color: jsonModeEnabled ? "#86efac" : "#94a3b8", fontSize: 12, fontWeight: 600 }}>
+              {t.jsonOutputMode}
+            </div>
+            <div style={{ color: "#475569", fontSize: 11, marginTop: 2 }}>
+              {t.jsonOutputModeHint}
+            </div>
+          </div>
+          <button
+            onClick={toggleJsonMode}
+            style={{
+              background: jsonModeEnabled ? "#15803d" : "#334155",
+              border: "none",
+              color: "white",
+              borderRadius: 12,
+              padding: "3px 12px",
+              cursor: "pointer",
+              fontSize: 11,
+              fontWeight: 600,
+              flexShrink: 0,
+            }}
+          >
+            {jsonModeEnabled ? "ON" : "OFF"}
+          </button>
         </div>
-        {functions.map((func, i) => (
-          <FunctionEditor
-            key={i}
-            index={i}
-            func={func}
-            onChange={(f) => updateFunction(i, f)}
-            onRemove={() => removeFunction(i)}
+
+        {jsonModeEnabled && (
+          <OutputSchemaEditor
+            schema={outputSchema}
+            onChange={(s) => update("output_schema", s)}
           />
-        ))}
-        <button onClick={addFunction} style={addBtnStyle}>
-          {t.addFunction}
-        </button>
+        )}
       </div>
 
+      {/* Functions (hidden in JSON mode) */}
+      {!jsonModeEnabled && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8, fontWeight: 600 }}>
+            {t.functions}
+          </div>
+          {functions.map((func, i) => (
+            <FunctionEditor
+              key={i}
+              index={i}
+              func={func}
+              onChange={(f) => updateFunction(i, f)}
+              onRemove={() => removeFunction(i)}
+            />
+          ))}
+          <button onClick={addFunction} style={addBtnStyle}>
+            {t.addFunction}
+          </button>
+        </div>
+      )}
+
       <div style={{ marginTop: 16 }}>
-        <div
-          style={{
-            color: "#94a3b8",
-            fontSize: 12,
-            marginBottom: 8,
-            fontWeight: 600,
-          }}
-        >
+        <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8, fontWeight: 600 }}>
           {t.skills}
         </div>
         <SkillMultiSelect

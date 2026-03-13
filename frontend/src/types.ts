@@ -26,6 +26,13 @@ export interface GraphEdge {
   condition?: EdgeCondition;
 }
 
+export interface OutputSchemaField {
+  key: string;
+  type: "string" | "number" | "integer" | "boolean";
+  description?: string;
+  enum?: string[];
+}
+
 export interface GraphNode {
   id: string;
   type: "router" | "regular" | "input" | "output";
@@ -38,6 +45,7 @@ export interface GraphNode {
   // Regular specific
   functions?: FunctionTool[];
   skills?: string[];
+  output_schema?: OutputSchemaField[];  // JSON structured output mode
   // UI position (not saved to YAML)
   position?: { x: number; y: number };
 }
