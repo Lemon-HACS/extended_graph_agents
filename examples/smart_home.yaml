@@ -4,9 +4,18 @@ description: Routes between smart home control and general assistance using an i
 model: gpt-4o
 
 nodes:
+  - id: input
+    type: input
+    name: Input
+
   - id: classify
     type: router
     name: Intent Classifier
+    output_key: intent
+    values:
+      - smart_home
+      - research
+      - general
     prompt: |
       You are an intent classifier. Classify this user request into exactly one of these categories:
       - smart_home: The user wants to control lights, switches, thermostats, or other smart home devices
@@ -16,17 +25,6 @@ nodes:
       User request: {{ state.user_input }}
 
       Respond with a JSON object with a single key "intent" and one of the above values.
-    output_key: intent
-    routes:
-      - match: smart_home
-        next: [smart_home_agent]
-        mode: sequential
-      - match: research
-        next: [web_search_agent, knowledge_agent]
-        mode: parallel
-      - match: "*"
-        next: [general_agent]
-        mode: sequential
 
   - id: smart_home_agent
     type: regular
@@ -112,7 +110,6 @@ nodes:
           type: template
           value_template: >
             {% set state = states(entity_id) %}
-            {% set attrs = state_attr(entity_id, None) %}
             Entity {{ entity_id }}: state={{ state }}
     skills: []
 
@@ -159,3 +156,47 @@ nodes:
       User request: {{ state.user_input }}
     functions: []
     skills: []
+
+  - id: output
+    type: output
+    name: Output
+
+edges:
+  - source: input
+    target: classify
+
+  - source: classify
+    target: smart_home_agent
+    condition:
+      variable: intent
+      value: smart_home
+
+  - source: classify
+    target: web_search_agent
+    mode: parallel
+    condition:
+      variable: intent
+      value: research
+
+  - source: classify
+    target: knowledge_agent
+    mode: parallel
+    condition:
+      variable: intent
+      value: research
+
+  # no condition = default fallback when no other condition matched
+  - source: classify
+    target: general_agent
+
+  - source: smart_home_agent
+    target: output
+
+  - source: web_search_agent
+    target: output
+
+  - source: knowledge_agent
+    target: output
+
+  - source: general_agent
+    target: output

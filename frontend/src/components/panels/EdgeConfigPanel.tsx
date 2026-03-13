@@ -1,6 +1,6 @@
 import { useGraphStore } from "../../store/graphStore";
 import { useLang } from "../../contexts/LangContext";
-import type { GraphNode } from "../../types";
+import type { GraphNode, EdgeCondition } from "../../types";
 
 interface EdgeConfigPanelProps {
   onClose: () => void;
@@ -20,9 +20,15 @@ export function EdgeConfigPanel({ onClose, isMobile, panelWidth = 380 }: EdgeCon
   const sourceName = ((sourceNode?.data as unknown as GraphNode)?.name) || selectedEdge.source;
   const targetName = ((targetNode?.data as unknown as GraphNode)?.name) || selectedEdge.target;
 
-  const match = (selectedEdge.data?.match as string) ?? "*";
+  const condition = (selectedEdge.data?.condition as EdgeCondition | null) ?? null;
+  const condVariable = condition?.variable ?? "";
+  const condValue = condition?.value ?? "";
   const mode = (selectedEdge.data?.mode as string) ?? "sequential";
-  const isSourceRouter = sourceNode?.type === "routerNode";
+
+  const handleConditionChange = (variable: string, value: string) => {
+    const newCondition = variable ? { variable, value } : null;
+    updateEdgeData(selectedEdge.id, { condition: newCondition });
+  };
 
   const handleDelete = () => {
     updateEdges(flowEdges.filter((e) => e.id !== selectedEdgeId));
@@ -100,8 +106,8 @@ export function EdgeConfigPanel({ onClose, isMobile, panelWidth = 380 }: EdgeCon
         >
           <span
             style={{
-              background: sourceNode?.type === "routerNode" ? "#1a3050" : "#162d16",
-              border: `1px solid ${sourceNode?.type === "routerNode" ? "#3b82f6" : "#22c55e"}`,
+              background: "#162d16",
+              border: "1px solid #22c55e",
               borderRadius: 4,
               padding: "2px 8px",
               fontSize: 12,
@@ -113,8 +119,8 @@ export function EdgeConfigPanel({ onClose, isMobile, panelWidth = 380 }: EdgeCon
           <span style={{ color: "#64748b", fontSize: 16 }}>→</span>
           <span
             style={{
-              background: targetNode?.type === "routerNode" ? "#1a3050" : "#162d16",
-              border: `1px solid ${targetNode?.type === "routerNode" ? "#3b82f6" : "#22c55e"}`,
+              background: "#162d16",
+              border: "1px solid #22c55e",
               borderRadius: 4,
               padding: "2px 8px",
               fontSize: 12,
@@ -125,83 +131,60 @@ export function EdgeConfigPanel({ onClose, isMobile, panelWidth = 380 }: EdgeCon
           </span>
         </div>
 
-        {/* Match / Mode — only meaningful for router source */}
-        {isSourceRouter ? (
-          <>
-            <div style={{ marginBottom: 10 }}>
-              <label
-                style={{
-                  display: "block",
-                  color: "#94a3b8",
-                  fontSize: 11,
-                  marginBottom: 4,
-                }}
-              >
-                {t.matchValue}
-              </label>
-              <input
-                value={match}
-                onChange={(e) => updateEdgeData(selectedEdge.id, { match: e.target.value })}
-                placeholder={t.matchPlaceholder}
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={{ marginBottom: 10 }}>
-              <label
-                style={{
-                  display: "block",
-                  color: "#94a3b8",
-                  fontSize: 11,
-                  marginBottom: 4,
-                }}
-              >
-                {t.executionMode}
-              </label>
-              <select
-                value={mode}
-                onChange={(e) => updateEdgeData(selectedEdge.id, { mode: e.target.value })}
-                style={inputStyle}
-              >
-                <option value="sequential">{t.sequential}</option>
-                <option value="parallel">{t.parallel}</option>
-              </select>
-            </div>
-
-            {/* Preview badge */}
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                background: mode === "parallel" ? "#92400e" : "#1e3a5f",
-                border: `1px solid ${mode === "parallel" ? "#f59e0b" : "#3b82f6"}`,
-                borderRadius: 12,
-                padding: "3px 10px",
-                fontSize: 11,
-                color: "white",
-                fontWeight: 600,
-                marginBottom: 16,
-              }}
-            >
-              {mode === "parallel" ? "∥ " : ""}
-              {match === "*" ? "default" : match}
-            </div>
-          </>
-        ) : (
-          <div
-            style={{
-              padding: 12,
-              background: "rgba(255,255,255,0.04)",
-              borderRadius: 8,
-              color: "#64748b",
-              fontSize: 12,
-              marginBottom: 16,
-            }}
+        {/* Execution mode */}
+        <div style={{ marginBottom: 10 }}>
+          <label style={labelStyle}>{t.executionMode}</label>
+          <select
+            value={mode}
+            onChange={(e) => updateEdgeData(selectedEdge.id, { mode: e.target.value })}
+            style={inputStyle}
           >
-            이 연결은 항상 실행됩니다.
+            <option value="sequential">{t.sequential}</option>
+            <option value="parallel">{t.parallel}</option>
+          </select>
+        </div>
+
+        {/* Condition */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>{t.conditionVariable}</label>
+          <input
+            value={condVariable}
+            onChange={(e) => handleConditionChange(e.target.value, condValue)}
+            placeholder="예: route, intent"
+            style={{ ...inputStyle, marginBottom: 6 }}
+          />
+          <label style={labelStyle}>{t.conditionValue}</label>
+          <input
+            value={condValue}
+            onChange={(e) => handleConditionChange(condVariable, e.target.value)}
+            placeholder="예: research, smart_home"
+            style={inputStyle}
+            disabled={!condVariable}
+          />
+          <div style={{ color: "#475569", fontSize: 11, marginTop: 6, lineHeight: 1.5 }}>
+            조건을 비워두면 다른 조건이 매칭되지 않을 때 기본 경로로 사용됩니다.
           </div>
-        )}
+        </div>
+
+        {/* Preview badge */}
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            background: mode === "parallel" ? "#92400e" : condVariable ? "#1e3a5f" : "#1e293b",
+            border: `1px solid ${mode === "parallel" ? "#f59e0b" : condVariable ? "#3b82f6" : "#334155"}`,
+            borderRadius: 12,
+            padding: "3px 10px",
+            fontSize: 11,
+            color: "white",
+            fontWeight: 600,
+            marginBottom: 16,
+          }}
+        >
+          {mode === "parallel" ? "∥ " : ""}
+          {condVariable ? `${condVariable}=${condValue}` : "default"}
+        </div>
 
         {/* Delete */}
         <button
@@ -223,6 +206,13 @@ export function EdgeConfigPanel({ onClose, isMobile, panelWidth = 380 }: EdgeCon
     </div>
   );
 }
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  color: "#94a3b8",
+  fontSize: 11,
+  marginBottom: 4,
+};
 
 const inputStyle: React.CSSProperties = {
   width: "100%",

@@ -1,5 +1,5 @@
 import type { Node, Edge } from "@xyflow/react";
-import type { GraphDefinition, GraphNode } from "../types";
+import type { GraphDefinition, GraphNode, GraphEdge, EdgeCondition } from "../types";
 import * as yaml from "js-yaml";
 
 // Auto-layout helper
@@ -39,70 +39,29 @@ export function graphToFlow(
     data: { ...node },
   }));
 
-  const flowEdges: Edge[] = [];
+  const flowEdges: Edge[] = (graph.edges ?? []).map((edge, idx) => {
+    const isParallel = edge.mode === "parallel";
+    const condition = edge.condition;
+    const hasCondition = !!(condition?.variable);
+    const label = hasCondition
+      ? `${condition!.variable}=${condition!.value}`
+      : undefined;
 
-  graph.nodes.forEach((node) => {
-    // Router → next nodes (via routes)
-    if (node.type === "router" && node.routes) {
-      node.routes.forEach((route, routeIdx) => {
-        (route.next ?? []).forEach((targetId, targetIdx) => {
-          flowEdges.push({
-            id: `${node.id}->${targetId}-r${routeIdx}-t${targetIdx}`,
-            source: node.id,
-            target: targetId,
-            type: "conditionalEdge",
-            label: route.match === "*" ? "default" : String(route.match),
-            data: {
-              match: route.match,
-              mode: route.mode ?? "sequential",
-            },
-            animated: route.mode === "parallel",
-            style: {
-              strokeDasharray: route.mode === "parallel" ? "5,5" : undefined,
-            },
-          });
-        });
-      });
-    }
-
-    // Input node → next nodes
-    if (node.type === "input" && node.next) {
-      node.next.forEach((targetId, idx) => {
-        flowEdges.push({
-          id: `${node.id}->${targetId}-i${idx}`,
-          source: node.id,
-          target: targetId,
-          type: "conditionalEdge",
-          data: { match: "*", mode: "sequential" },
-        });
-      });
-    }
-
-    // Regular node → next nodes (fan-in join edges)
-    if (node.type === "regular" && node.next && node.next.length > 0) {
-      node.next.forEach((targetId, idx) => {
-        flowEdges.push({
-          id: `${node.id}->${targetId}-rn${idx}`,
-          source: node.id,
-          target: targetId,
-          type: "conditionalEdge",
-          data: { match: "*", mode: "sequential" },
-        });
-      });
-    }
-
-    // Output node ← input_from nodes
-    if (node.type === "output" && node.input_from) {
-      node.input_from.forEach((sourceId, idx) => {
-        flowEdges.push({
-          id: `${sourceId}->${node.id}-o${idx}`,
-          source: sourceId,
-          target: node.id,
-          type: "conditionalEdge",
-          data: { match: "*", mode: "sequential" },
-        });
-      });
-    }
+    return {
+      id: `${edge.source}->${edge.target}-${idx}`,
+      source: edge.source,
+      target: edge.target,
+      type: "conditionalEdge",
+      label,
+      data: {
+        condition: condition ?? null,
+        mode: edge.mode ?? "sequential",
+      },
+      animated: isParallel,
+      style: {
+        strokeDasharray: isParallel ? "5,5" : undefined,
+      },
+    };
   });
 
   return { nodes: flowNodes, edges: flowEdges };
@@ -113,94 +72,44 @@ export function flowToGraph(
   flowNodes: Node[],
   flowEdges: Edge[]
 ): GraphDefinition {
-  // Collect outgoing edges per source node
-  const outgoingEdges: Record<string, string[]> = {};
-  // Collect incoming edges per target node
-  const incomingEdges: Record<string, string[]> = {};
-
-  flowEdges.forEach((edge) => {
-    if (!outgoingEdges[edge.source]) outgoingEdges[edge.source] = [];
-    outgoingEdges[edge.source].push(edge.target);
-    if (!incomingEdges[edge.target]) incomingEdges[edge.target] = [];
-    incomingEdges[edge.target].push(edge.source);
-  });
-
-  // Rebuild router routes from edges
-  const routerEdges: Record<
-    string,
-    Array<{ match: string; targets: string[]; mode: string }>
-  > = {};
-
-  flowEdges.forEach((edge) => {
-    const sourceNode = flowNodes.find((n) => n.id === edge.source);
-    if (sourceNode?.type !== "routerNode") return;
-
-    const match = (edge.data?.match as string) ?? "*";
-    const mode = (edge.data?.mode as string) ?? "sequential";
-
-    if (!routerEdges[edge.source]) {
-      routerEdges[edge.source] = [];
-    }
-
-    const existing = routerEdges[edge.source].find((r) => r.match === match);
-    if (existing) {
-      existing.targets.push(edge.target);
-    } else {
-      routerEdges[edge.source].push({ match, targets: [edge.target], mode });
-    }
-  });
-
   const nodes: GraphNode[] = flowNodes.map((n) => {
     const nodeData = { ...n.data } as unknown as GraphNode;
     nodeData.id = n.id;
-
-    if (nodeData.type === "router") {
-      const edgeRoutes = routerEdges[n.id] ?? [];
-      nodeData.routes = edgeRoutes.map((r) => ({
-        match: r.match,
-        next: r.targets,
-        mode: r.mode as "sequential" | "parallel",
-      }));
-    } else if (nodeData.type === "input") {
-      // Save outgoing edges as `next`
-      const targets = outgoingEdges[n.id] ?? [];
-      // Exclude output nodes from next (output node handles its own input_from)
-      nodeData.next = targets.filter((targetId) => {
-        const targetNode = flowNodes.find((fn) => fn.id === targetId);
-        return targetNode?.type !== "outputNode";
-      });
-    } else if (nodeData.type === "regular") {
-      // Save outgoing edges as `next` for fan-in join support
-      const targets = outgoingEdges[n.id] ?? [];
-      const nextIds = targets.filter((targetId) => {
-        const targetNode = flowNodes.find((fn) => fn.id === targetId);
-        return targetNode?.type !== "outputNode";
-      });
-      if (nextIds.length > 0) {
-        nodeData.next = nextIds;
-      } else {
-        delete nodeData.next;
-      }
-    } else if (nodeData.type === "output") {
-      // Save incoming edges as `input_from`
-      nodeData.input_from = incomingEdges[n.id] ?? [];
-      // Remove `next` field if present
-      delete nodeData.next;
-    }
-
+    // Strip legacy fields and UI-only fields
+    delete (nodeData as any).next;
+    delete (nodeData as any).input_from;
+    delete (nodeData as any).routes;
+    delete (nodeData as any).position;
     return nodeData;
   });
 
-  return {
-    ...graphMeta,
-    nodes,
-  };
+  const edges: GraphEdge[] = flowEdges.map((edge) => {
+    const def: GraphEdge = {
+      source: edge.source,
+      target: edge.target,
+    };
+    const mode = edge.data?.mode as string | undefined;
+    if (mode === "parallel") {
+      def.mode = "parallel";
+    }
+    const condition = edge.data?.condition as EdgeCondition | null | undefined;
+    if (condition?.variable) {
+      def.condition = condition;
+    }
+    return def;
+  });
+
+  return { ...graphMeta, nodes, edges };
 }
 
 export function graphToYaml(graph: GraphDefinition): string {
-  // Remove UI-only fields
   const clean = JSON.parse(JSON.stringify(graph));
-  clean.nodes.forEach((n: GraphNode) => delete n.position);
+  clean.nodes.forEach((n: GraphNode) => {
+    delete n.position;
+    delete (n as any).next;
+    delete (n as any).input_from;
+    delete (n as any).routes;
+  });
   return yaml.dump(clean, { lineWidth: 120, noRefs: true });
 }
 

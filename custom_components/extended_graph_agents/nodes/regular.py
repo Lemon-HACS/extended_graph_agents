@@ -174,13 +174,7 @@ class RegularNode(BaseNode):
         # Store result in state
         state.node_outputs[self.node_id] = final_response
 
-        # Support fan-in: regular nodes can specify next nodes
-        next_ids = self.config.get("next", [])
-        if isinstance(next_ids, str):
-            next_ids = [next_ids]
-
         return NodeResult(
             node_id=self.node_id,
             output=final_response,
-            next_node_ids=next_ids,
         )

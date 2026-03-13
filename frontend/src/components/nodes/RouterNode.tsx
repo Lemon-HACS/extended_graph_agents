@@ -45,32 +45,27 @@ export function RouterNode({ data, selected }: NodeProps) {
         </div>
       )}
 
-      {node.routes && node.routes.length > 0 && (
+      {node.values && node.values.length > 0 && (
         <div
           style={{
             marginTop: 6,
             display: "flex",
-            flexDirection: "column",
-            gap: 2,
+            flexWrap: "wrap",
+            gap: 3,
           }}
         >
-          {node.routes.map((r, i) => (
-            <div
-              key={i}
+          {node.values.map((v) => (
+            <span
+              key={v}
               style={{
                 fontSize: 10,
                 background: "rgba(255,255,255,0.1)",
                 borderRadius: 4,
                 padding: "2px 6px",
-                display: "flex",
-                justifyContent: "space-between",
               }}
             >
-              <span>{r.match === "*" ? "default" : r.match}</span>
-              <span style={{ opacity: 0.7 }}>
-                {r.mode === "parallel" ? "∥" : "→"} {r.next?.join(", ")}
-              </span>
-            </div>
+              {v}
+            </span>
           ))}
         </div>
       )}

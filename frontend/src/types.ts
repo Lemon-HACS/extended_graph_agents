@@ -1,9 +1,3 @@
-export interface RouteConfig {
-  match: string;
-  next: string[];
-  mode?: "sequential" | "parallel";
-}
-
 export interface FunctionSpec {
   name: string;
   description: string;
@@ -20,6 +14,18 @@ export interface FunctionTool {
   function: FunctionConfig;
 }
 
+export interface EdgeCondition {
+  variable: string;
+  value: string;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  mode?: "sequential" | "parallel";
+  condition?: EdgeCondition;
+}
+
 export interface GraphNode {
   id: string;
   type: "router" | "regular" | "input" | "output";
@@ -28,14 +34,10 @@ export interface GraphNode {
   prompt?: string;
   // Router specific
   output_key?: string;
-  routes?: RouteConfig[];
+  values?: string[];      // enum options for LLM structured output
   // Regular specific
   functions?: FunctionTool[];
   skills?: string[];
-  // Input node specific
-  next?: string[];
-  // Output node specific
-  input_from?: string[];
   // UI position (not saved to YAML)
   position?: { x: number; y: number };
 }
@@ -46,6 +48,7 @@ export interface GraphDefinition {
   description?: string;
   model?: string;
   nodes: GraphNode[];
+  edges: GraphEdge[];
 }
 
 export interface GraphSummary {

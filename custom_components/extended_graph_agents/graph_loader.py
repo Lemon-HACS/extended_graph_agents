@@ -1,12 +1,23 @@
 """Graph definition loader."""
 from __future__ import annotations
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 import yaml
 from .exceptions import GraphNotFound, InvalidGraph
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class EdgeDefinition:
+    """Represents a directed edge between two nodes."""
+
+    source: str
+    target: str
+    mode: str = "sequential"       # "sequential" | "parallel"
+    condition: dict | None = None  # {"variable": str, "value": str}
 
 
 class GraphDefinition:
@@ -18,6 +29,15 @@ class GraphDefinition:
         self.description: str = data.get("description", "")
         self.model: str = data.get("model", "gpt-4o")
         self.nodes: list[dict[str, Any]] = data.get("nodes", [])
+        self.edges: list[EdgeDefinition] = [
+            EdgeDefinition(
+                source=e["source"],
+                target=e["target"],
+                mode=e.get("mode", "sequential"),
+                condition=e.get("condition"),
+            )
+            for e in data.get("edges", [])
+        ]
         self.file_path = file_path
         self._raw = data
 
@@ -36,39 +56,34 @@ class GraphDefinition:
             raise InvalidGraph("Graph must have an 'id' field")
         if not self.nodes:
             raise InvalidGraph(f"Graph '{self.id}' has no nodes")
+
         node_ids = {n["id"] for n in self.nodes}
         input_count = 0
         output_count = 0
+
         for node in self.nodes:
             if "id" not in node:
                 raise InvalidGraph("All nodes must have an 'id' field")
             if "type" not in node:
                 raise InvalidGraph(f"Node '{node['id']}' must have a 'type' field")
-            if node["type"] == "router":
-                for route in node.get("routes", []):
-                    for next_id in (route.get("next") or []):
-                        if isinstance(next_id, str) and next_id not in node_ids:
-                            raise InvalidGraph(
-                                f"Router '{node['id']}' references unknown node '{next_id}'"
-                            )
-            elif node["type"] == "input":
+            if node["type"] == "input":
                 input_count += 1
                 if input_count > 1:
                     raise InvalidGraph(f"Graph '{self.id}' has more than one input node")
-                for next_id in (node.get("next") or []):
-                    if isinstance(next_id, str) and next_id not in node_ids:
-                        raise InvalidGraph(
-                            f"Input node references unknown node '{next_id}'"
-                        )
             elif node["type"] == "output":
                 output_count += 1
                 if output_count > 1:
                     raise InvalidGraph(f"Graph '{self.id}' has more than one output node")
-                for src_id in (node.get("input_from") or []):
-                    if isinstance(src_id, str) and src_id not in node_ids:
-                        raise InvalidGraph(
-                            f"Output node input_from references unknown node '{src_id}'"
-                        )
+
+        for edge in self.edges:
+            if edge.source not in node_ids:
+                raise InvalidGraph(f"Edge references unknown source node '{edge.source}'")
+            if edge.target not in node_ids:
+                raise InvalidGraph(f"Edge references unknown target node '{edge.target}'")
+            if edge.mode not in ("sequential", "parallel"):
+                raise InvalidGraph(
+                    f"Edge mode must be 'sequential' or 'parallel', got '{edge.mode}'"
+                )
 
     def get_node(self, node_id: str) -> dict[str, Any] | None:
         return next((n for n in self.nodes if n["id"] == node_id), None)
@@ -76,6 +91,10 @@ class GraphDefinition:
     def get_start_node(self) -> dict[str, Any]:
         """Return input node if exists, else first node."""
         return self.input_node or self.nodes[0]
+
+    def get_outgoing_edges(self, node_id: str) -> list[EdgeDefinition]:
+        """Return all edges originating from the given node."""
+        return [e for e in self.edges if e.source == node_id]
 
     def to_dict(self) -> dict[str, Any]:
         return self._raw

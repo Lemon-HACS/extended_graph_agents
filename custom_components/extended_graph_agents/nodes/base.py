@@ -13,8 +13,6 @@ class NodeResult:
     node_id: str
     output: str
     variables_set: dict[str, Any] = field(default_factory=dict)
-    next_node_ids: list[str] = field(default_factory=list)  # populated by router
-    execution_mode: str = "sequential"  # "sequential" or "parallel"
 
 
 class BaseNode(ABC):

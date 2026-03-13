@@ -14,7 +14,7 @@ interface NodeConfigPanelProps {
 }
 
 export function NodeConfigPanel({ conn, onClose, isMobile, panelWidth = 380 }: NodeConfigPanelProps) {
-  const { flowNodes, flowEdges, selectedNodeId, updateNodeData, updateNodes, updateEdges, deleteNode } = useGraphStore();
+  const { flowNodes, selectedNodeId, updateNodeData, updateNodes, deleteNode } = useGraphStore();
   const t = useLang();
   const selectedNode = flowNodes.find((n) => n.id === selectedNodeId);
 
@@ -183,10 +183,9 @@ function RouterConfig({
   update: (f: string, v: unknown) => void;
 }) {
   const t = useLang();
-  const { flowEdges, flowNodes, updateEdgeData, updateEdges, selectEdge } = useGraphStore();
+  const { flowEdges, flowNodes } = useGraphStore();
 
-  // 이 라우터에서 나가는 엣지들만 필터
-  const routerEdges = flowEdges.filter((e) => e.source === data.id);
+  const outgoingEdges = flowEdges.filter((e) => e.source === data.id);
 
   return (
     <div>
@@ -198,153 +197,72 @@ function RouterConfig({
         />
       </Field>
 
-      <div style={{ marginTop: 16 }}>
-        <div
-          style={{
-            color: "#94a3b8",
-            fontSize: 12,
-            marginBottom: 8,
-            fontWeight: 600,
-          }}
-        >
-          {t.routes}
+      <Field label="Values (LLM 선택지)">
+        <input
+          value={(data.values ?? []).join(", ")}
+          onChange={(e) =>
+            update(
+              "values",
+              e.target.value
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+            )
+          }
+          placeholder="예: research, smart_home, general"
+          style={inputStyle}
+        />
+        <div style={{ color: "#475569", fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>
+          LLM이 이 값 중 하나를 선택합니다. 엣지 조건과 일치시켜 주세요.
         </div>
+      </Field>
 
-        {routerEdges.length === 0 ? (
-          <div
-            style={{
-              padding: 12,
-              background: "rgba(255,255,255,0.03)",
-              borderRadius: 8,
-              color: "#475569",
-              fontSize: 12,
-              lineHeight: 1.6,
-              marginBottom: 8,
-            }}
-          >
-            {t.connectInCanvas}
+      {outgoingEdges.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8, fontWeight: 600 }}>
+            연결된 엣지
           </div>
-        ) : (
-          routerEdges.map((edge) => {
+          {outgoingEdges.map((edge) => {
             const targetNode = flowNodes.find((n) => n.id === edge.target);
-            const targetName =
-              ((targetNode?.data as unknown as GraphNode)?.name) || edge.target;
-            const match = (edge.data?.match as string) ?? "*";
-            const mode = (edge.data?.mode as string) ?? "sequential";
-
+            const targetName = ((targetNode?.data as unknown as GraphNode)?.name) || edge.target;
+            const condition = edge.data?.condition as { variable?: string; value?: string } | null;
+            const condLabel = condition?.variable
+              ? `${condition.variable}=${condition.value}`
+              : "default";
             return (
               <div
                 key={edge.id}
                 style={{
-                  background: "#1e293b",
-                  borderRadius: 8,
-                  padding: 12,
-                  marginBottom: 8,
-                  cursor: "pointer",
-                  border: "1px solid transparent",
-                  transition: "border-color 0.15s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "5px 0",
+                  borderBottom: "1px solid #1e293b",
+                  fontSize: 12,
+                  color: "#94a3b8",
                 }}
-                onMouseEnter={(e) =>
-                  ((e.currentTarget as HTMLDivElement).style.borderColor = "#334155")
-                }
-                onMouseLeave={(e) =>
-                  ((e.currentTarget as HTMLDivElement).style.borderColor = "transparent")
-                }
               >
-                {/* Header: target node name + delete */}
-                <div
+                <span style={{ color: "#64748b" }}>→</span>
+                <span style={{ color: "#86efac", flex: 1 }}>{targetName}</span>
+                <span
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 8,
+                    background: "#1e293b",
+                    borderRadius: 8,
+                    padding: "1px 7px",
+                    fontSize: 11,
+                    color: "#60a5fa",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ color: "#64748b", fontSize: 11 }}>→</span>
-                    <span
-                      style={{
-                        background: "#162d16",
-                        border: "1px solid #22c55e",
-                        borderRadius: 4,
-                        padding: "1px 7px",
-                        fontSize: 11,
-                        color: "#86efac",
-                      }}
-                    >
-                      {targetName}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      updateEdges(flowEdges.filter((e) => e.id !== edge.id));
-                    }}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#ef4444",
-                      cursor: "pointer",
-                      fontSize: 14,
-                      lineHeight: 1,
-                      padding: 2,
-                    }}
-                    title="엣지 삭제"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <Field label={t.matchValue}>
-                  <select
-                    value={match}
-                    onChange={(e) => {
-                      updateEdgeData(edge.id, { match: e.target.value });
-                      selectEdge(edge.id);
-                    }}
-                    style={inputStyle}
-                  >
-                    <option value="*">* (default)</option>
-                    {flowNodes
-                      .filter((n) => n.id !== data.id)
-                      .map((n) => {
-                        const nodeName = (n.data as unknown as GraphNode)?.name;
-                        return (
-                          <option key={n.id} value={n.id}>
-                            {nodeName ? `${nodeName} (${n.id})` : n.id}
-                          </option>
-                        );
-                      })}
-                  </select>
-                </Field>
-
-                <Field label={t.executionMode}>
-                  <select
-                    value={mode}
-                    onChange={(e) =>
-                      updateEdgeData(edge.id, { mode: e.target.value })
-                    }
-                    style={inputStyle}
-                  >
-                    <option value="sequential">{t.sequential}</option>
-                    <option value="parallel">{t.parallel}</option>
-                  </select>
-                </Field>
+                  {condLabel}
+                </span>
               </div>
             );
-          })
-        )}
-
-        <div
-          style={{
-            color: "#334155",
-            fontSize: 11,
-            marginTop: 4,
-            textAlign: "center",
-          }}
-        >
-          {t.connectInCanvas}
+          })}
+          <div style={{ color: "#334155", fontSize: 11, marginTop: 8 }}>
+            엣지를 클릭하면 조건 및 모드를 설정할 수 있습니다.
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

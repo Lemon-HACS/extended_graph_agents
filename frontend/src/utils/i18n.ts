@@ -65,6 +65,8 @@ const en = {
   edgeTo: "To",
   deleteEdge: "Delete Edge",
   connectInCanvas: "Draw connections in the canvas to add routes",
+  conditionVariable: "Condition Variable",
+  conditionValue: "Condition Value",
 
   // Dialogs
   confirmDelete: (id: string) => `Delete graph "${id}"?`,
@@ -200,6 +202,8 @@ const ko: typeof en = {
   edgeTo: "도착",
   deleteEdge: "엣지 삭제",
   connectInCanvas: "캔버스에서 노드를 연결하여 라우트를 추가하세요",
+  conditionVariable: "조건 변수",
+  conditionValue: "조건 값",
 
   // Dialogs
   confirmDelete: (id: string) => `"${id}" 그래프를 삭제하시겠습니까?`,

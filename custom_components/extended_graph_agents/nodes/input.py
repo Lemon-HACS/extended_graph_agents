@@ -21,13 +21,7 @@ class InputNode(BaseNode):
     ) -> NodeResult:
         # Store user input as this node's output and pass to next nodes
         state.node_outputs[self.node_id] = state.user_input
-        next_nodes = self.config.get("next", [])
-        if isinstance(next_nodes, str):
-            next_nodes = [next_nodes]
-
         return NodeResult(
             node_id=self.node_id,
             output=state.user_input,
-            next_node_ids=next_nodes,
-            execution_mode="sequential",
         )

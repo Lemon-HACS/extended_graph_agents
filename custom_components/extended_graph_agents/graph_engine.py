@@ -47,12 +47,10 @@ class GraphEngine:
         llm_context: llm.LLMContext | None = None,
     ) -> str:
         """Execute the graph and return final response."""
-        # Apply default model to nodes that don't specify one
         for node_config in graph.nodes:
             if "model" not in node_config:
                 node_config["model"] = graph.model or self.default_model
 
-        # Start from input node if present, else first node
         start_node_config = graph.get_start_node()
 
         steps = 0
@@ -67,52 +65,91 @@ class GraphEngine:
                 results = await self._execute_parallel(
                     graph, node_ids, state, exposed_entities, llm_context
                 )
-                # Fan-in: deduplicate next nodes across all parallel branches.
-                # If multiple branches point to the same node, it runs once (join/barrier).
+                # Fan-in: collect next batches from all parallel branches, deduplicating targets.
                 seen_next: set[str] = set()
                 fan_in_next: list[str] = []
                 for result in results:
-                    for nid in result.next_node_ids:
-                        if nid not in seen_next:
-                            seen_next.add(nid)
-                            fan_in_next.append(nid)
+                    for batch_ids, _ in self._resolve_next_nodes(graph, result.node_id, state):
+                        for nid in batch_ids:
+                            if nid not in seen_next:
+                                seen_next.add(nid)
+                                fan_in_next.append(nid)
                 if fan_in_next:
                     pending.append((fan_in_next, "sequential"))
             else:
-                results = []
                 for node_id in node_ids:
                     result = await self._execute_single(
                         graph, node_id, state, exposed_entities, llm_context
                     )
-                    results.append(result)
-                    if result.next_node_ids:
-                        pending.append((result.next_node_ids, result.execution_mode))
+                    batches = self._resolve_next_nodes(graph, result.node_id, state)
+                    pending.extend(batches)
 
-        # Determine final output
         return self._collect_final_output(graph, state)
+
+    def _resolve_next_nodes(
+        self,
+        graph: GraphDefinition,
+        node_id: str,
+        state: GraphState,
+    ) -> list[tuple[list[str], str]]:
+        """Determine the next execution batches based on outgoing edges.
+
+        Conditional edges are evaluated against state variables.
+        Unconditional edges act as default fallback — they fire only when
+        no conditional edge matched. This allows clean router default routes.
+
+        Returns a list of (node_ids, mode) tuples to enqueue.
+        Parallel-mode targets are grouped into one batch; each sequential
+        target becomes its own batch.
+        """
+        outgoing = graph.get_outgoing_edges(node_id)
+        if not outgoing:
+            return []
+
+        conditional = [e for e in outgoing if e.condition is not None]
+        unconditional = [e for e in outgoing if e.condition is None]
+
+        matched = [
+            e for e in conditional
+            if str(state.get(e.condition["variable"], "")) == str(e.condition["value"])
+        ]
+
+        # Exclusive fallback: if any conditional matched, fire those.
+        # Otherwise fire unconditional edges as the default path.
+        firing = matched if matched else unconditional
+        if not firing:
+            return []
+
+        parallel_targets = [e.target for e in firing if e.mode == "parallel"]
+        sequential_targets = [e.target for e in firing if e.mode != "parallel"]
+
+        batches: list[tuple[list[str], str]] = []
+        if parallel_targets:
+            batches.append((parallel_targets, "parallel"))
+        for target in sequential_targets:
+            batches.append(([target], "sequential"))
+
+        return batches
 
     def _collect_final_output(self, graph: GraphDefinition, state: GraphState) -> str:
         """Determine the final output text from the executed graph."""
-        # 1. If there's an output node, use the node(s) that feed into it
         output_node = graph.output_node
         if output_node is not None:
-            input_from = output_node.get("input_from", [])
-            if isinstance(input_from, str):
-                input_from = [input_from]
-            for src_id in input_from:
-                if src_id in state.node_outputs:
+            # Find nodes that have edges pointing to the output node
+            incoming_sources = [
+                e.source for e in graph.edges if e.target == output_node["id"]
+            ]
+            for src_id in incoming_sources:
+                if src_id in state.node_outputs and state.node_outputs[src_id]:
                     return state.node_outputs[src_id]
-            # If output node executed itself (e.g., routed to it)
-            if output_node["id"] in state.node_outputs:
-                return state.node_outputs[output_node["id"]]
 
-        # 2. Fallback: last regular node in reverse YAML order
+        # Fallback: last regular node in reverse order
         for node_config in reversed(graph.nodes):
             node_id = node_config["id"]
             if node_id in state.node_outputs and node_config.get("type") == "regular":
                 return state.node_outputs[node_id]
 
-        # 3. Last resort: any last output
+        # Last resort: any last output
         if state.node_outputs:
             return list(state.node_outputs.values())[-1]
 

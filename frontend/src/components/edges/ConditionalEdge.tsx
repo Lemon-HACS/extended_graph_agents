@@ -4,12 +4,10 @@ import {
   getBezierPath,
 } from "@xyflow/react";
 import type { EdgeProps } from "@xyflow/react";
-import { useGraphStore } from "../../store/graphStore";
-import type { GraphNode } from "../../types";
+import type { EdgeCondition } from "../../types";
 
 export function ConditionalEdge({
   id,
-  source,
   sourceX,
   sourceY,
   targetX,
@@ -29,15 +27,12 @@ export function ConditionalEdge({
     targetPosition,
   });
 
-  const { flowNodes } = useGraphStore();
-  const sourceNode = flowNodes.find((n) => n.id === source);
-
-  // Determine edge kind by source node type
-  const isRouterSource = sourceNode?.type === "routerNode";
+  const condition = data?.condition as EdgeCondition | null;
   const isParallel = data?.mode === "parallel";
+  const hasCondition = !!(condition?.variable);
 
-  if (!isRouterSource) {
-    // Fan-in / pass-through edge (regular → regular, input → node, etc.)
+  // Plain pass-through: no condition, not parallel
+  if (!hasCondition && !isParallel) {
     return (
       <>
         <BaseEdge
@@ -55,13 +50,9 @@ export function ConditionalEdge({
     );
   }
 
-  // Router edge: show match label and parallel indicator
-  const matchVal = String(data?.match ?? "");
-  const matchedNode = flowNodes.find((n) => n.id === matchVal);
-  const matchedName = matchedNode
-    ? ((matchedNode.data as unknown as GraphNode)?.name ?? matchVal)
-    : null;
-  const label = matchVal === "*" ? "default" : (matchedName ?? matchVal);
+  const label = hasCondition
+    ? `${condition!.variable}=${condition!.value}`
+    : "∥";
 
   return (
     <>
@@ -75,35 +66,33 @@ export function ConditionalEdge({
           ...style,
         }}
       />
-      {label && (
-        <EdgeLabelRenderer>
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: "absolute",
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: "all",
+            zIndex: 1000,
+          }}
+          className="nodrag nopan"
+        >
           <div
             style={{
-              position: "absolute",
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-              pointerEvents: "all",
-              zIndex: 1000,
+              background: isParallel ? "#92400e" : "#1e3a5f",
+              color: "white",
+              padding: "2px 8px",
+              borderRadius: 12,
+              fontSize: 11,
+              fontWeight: 600,
+              border: `1px solid ${isParallel ? "#f59e0b" : "#3b82f6"}`,
+              whiteSpace: "nowrap",
             }}
-            className="nodrag nopan"
           >
-            <div
-              style={{
-                background: isParallel ? "#92400e" : "#1e3a5f",
-                color: "white",
-                padding: "2px 8px",
-                borderRadius: 12,
-                fontSize: 11,
-                fontWeight: 600,
-                border: `1px solid ${isParallel ? "#f59e0b" : "#3b82f6"}`,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {isParallel ? "∥ " : ""}
-              {label}
-            </div>
+            {isParallel ? "∥ " : ""}
+            {label}
           </div>
-        </EdgeLabelRenderer>
-      )}
+        </div>
+      </EdgeLabelRenderer>
     </>
   );
 }

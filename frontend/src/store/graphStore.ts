@@ -161,6 +161,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       description: "",
       model: "gpt-4o",
       nodes: [],
+      edges: [],
     };
     const { nodes, edges } = graphToFlow(graph);
     get().addLog("info", `새 그래프 생성: id=${id}`);
@@ -222,10 +223,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       : "New Agent";
 
     const extraData =
-      type === "router" ? { output_key: "route", routes: [] }
-      : type === "input" ? { next: [] }
-      : type === "output" ? { input_from: [] }
-      : { functions: [], skills: [] };
+      type === "router" ? { output_key: "route", values: [] }
+      : type === "regular" ? { functions: [], skills: [] }
+      : {};
 
     const newNode: Node = {
       id,
