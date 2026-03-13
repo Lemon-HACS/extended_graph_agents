@@ -68,7 +68,7 @@ export function graphToFlow(
 }
 
 export function flowToGraph(
-  graphMeta: Pick<GraphDefinition, "id" | "name" | "description" | "model">,
+  graphMeta: Pick<GraphDefinition, "id" | "name" | "description" | "model" | "model_params" | "system_prompt_prefix" | "max_tool_iterations">,
   flowNodes: Node[],
   flowEdges: Edge[]
 ): GraphDefinition {

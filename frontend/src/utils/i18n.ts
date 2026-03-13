@@ -22,7 +22,6 @@ const en = {
   save: "Save*",
   saved: "Saved",
   saving: "...",
-  debug: "DEBUG",
 
   // NodeConfigPanel
   nodeConfig: "Node Config",
@@ -77,6 +76,19 @@ const en = {
   conditionValue: "Condition Value",
   outputTemplate: "Output Template (optional)",
   outputTemplateHint: "Jinja2 template for final response. Leave blank to use the first incoming node's output.",
+
+  // GraphSettingsPanel
+  graphSettings: "Graph Settings",
+  defaultModel: "Default Model",
+  systemPromptPrefix: "System Prompt Prefix",
+  systemPromptPrefixHint: "Prepended to every node's system prompt in this graph.",
+  defaultMaxToolIterations: "Default Max Tool Iterations",
+  modelParams: "Model Parameters",
+  paramTemperature: "Temperature",
+  paramTopP: "Top P",
+  paramMaxTokens: "Max Tokens",
+  paramReasoningEffort: "Reasoning Effort",
+  modelPresets: "Presets",
 
   // Dialogs
   confirmDelete: (id: string) => `Delete graph "${id}"?`,
@@ -169,7 +181,6 @@ const ko: typeof en = {
   save: "저장*",
   saved: "저장됨",
   saving: "...",
-  debug: "디버그",
 
   // NodeConfigPanel
   nodeConfig: "노드 설정",
@@ -224,6 +235,19 @@ const ko: typeof en = {
   conditionValue: "조건 값",
   outputTemplate: "출력 템플릿 (선택)",
   outputTemplateHint: "최종 응답을 Jinja2 템플릿으로 조합합니다. 비워두면 연결된 첫 번째 노드의 출력을 사용합니다.",
+
+  // GraphSettingsPanel
+  graphSettings: "그래프 설정",
+  defaultModel: "기본 모델",
+  systemPromptPrefix: "시스템 프롬프트 접두사",
+  systemPromptPrefixHint: "이 그래프의 모든 노드 시스템 프롬프트 앞에 자동으로 추가됩니다.",
+  defaultMaxToolIterations: "기본 최대 도구 반복 횟수",
+  modelParams: "모델 파라미터",
+  paramTemperature: "Temperature",
+  paramTopP: "Top P",
+  paramMaxTokens: "Max Tokens",
+  paramReasoningEffort: "Reasoning Effort",
+  modelPresets: "프리셋",
 
   // Dialogs
   confirmDelete: (id: string) => `"${id}" 그래프를 삭제하시겠습니까?`,

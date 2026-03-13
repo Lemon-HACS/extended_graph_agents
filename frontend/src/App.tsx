@@ -5,7 +5,7 @@ import { SkillWorkspace } from "./components/panels/SkillWorkspace";
 import { GraphEditor } from "./components/GraphEditor";
 import { NodeConfigPanel } from "./components/panels/NodeConfigPanel";
 import { EdgeConfigPanel } from "./components/panels/EdgeConfigPanel";
-import { DebugPanel } from "./components/panels/DebugPanel";
+import { GraphSettingsPanel } from "./components/panels/GraphSettingsPanel";
 import { useGraphStore } from "./store/graphStore";
 import { useSkillStore } from "./store/skillStore";
 import { listGraphs, getGraph, saveGraph, deleteGraph, listSkills } from "./utils/haApi";
@@ -26,7 +26,7 @@ interface AppProps {
 export function App({ hass }: AppProps) {
   const t = getTranslations(hass.language ?? "en");
   const [showYaml, setShowYaml] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
+  const [showGraphSettings, setShowGraphSettings] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [sidebarView, setSidebarView] = useState<"graphs" | "skills">("graphs");
   const { setSkillList } = useSkillStore();
@@ -44,7 +44,6 @@ export function App({ hass }: AppProps) {
     isSaving,
     setIsSaving,
     getCurrentGraphDef,
-    addLog,
   } = useGraphStore();
 
   const { isMobile, isTablet } = useWindowSize();
@@ -61,15 +60,11 @@ export function App({ hass }: AppProps) {
 
   // Load graph list and skill list on mount
   useEffect(() => {
-    addLog("info", "그래프 목록 로드 중...");
     listGraphs(conn)
       .then((list) => {
         setGraphList(list);
-        addLog("info", `그래프 목록 로드 완료: ${list.length}개`);
       })
-      .catch((err) => {
-        addLog("error", `그래프 목록 로드 실패: ${String(err)}`);
-      });
+      .catch(() => {/* ignore */});
     listSkills(conn)
       .then((list) => setSkillList(list))
       .catch(() => {/* skills dir may not exist yet */});
@@ -78,15 +73,10 @@ export function App({ hass }: AppProps) {
 
   const handleSelectGraph = useCallback(
     async (id: string) => {
-      addLog("info", `그래프 선택: ${id}`);
-      try {
-        const graph = await getGraph(conn, id);
-        loadGraph(graph);
-      } catch (err) {
-        addLog("error", `그래프 로드 실패: ${String(err)}`);
-      }
+      const graph = await getGraph(conn, id);
+      loadGraph(graph);
     },
-    [conn, loadGraph, addLog]
+    [conn, loadGraph]
   );
 
   const handleNew = useCallback(() => {
@@ -96,20 +86,17 @@ export function App({ hass }: AppProps) {
   const handleSave = useCallback(async () => {
     const graphDef = getCurrentGraphDef();
     if (!graphDef) return;
-    addLog("info", `그래프 저장 시작: "${graphDef.name}"`);
     setIsSaving(true);
     try {
       await saveGraph(conn, graphDef);
       const updatedList = await listGraphs(conn);
       setGraphList(updatedList);
-      addLog("info", `그래프 저장 완료: "${graphDef.name}"`);
     } catch (err) {
-      addLog("error", `그래프 저장 실패: ${String(err)}`);
       alert(t.failedToSave(String(err)));
     } finally {
       setIsSaving(false);
     }
-  }, [conn, getCurrentGraphDef, setGraphList, setIsSaving, addLog]);
+  }, [conn, getCurrentGraphDef, setGraphList, setIsSaving]);
 
   // Ctrl+S 단축키로 그래프 저장
   useEffect(() => {
@@ -126,17 +113,11 @@ export function App({ hass }: AppProps) {
   const handleDelete = useCallback(
     async (id: string) => {
       if (!confirm(t.confirmDelete(id))) return;
-      addLog("warn", `그래프 삭제: ${id}`);
-      try {
-        await deleteGraph(conn, id);
-        const updatedList = await listGraphs(conn);
-        setGraphList(updatedList);
-        addLog("info", `그래프 삭제 완료: ${id}`);
-      } catch (err) {
-        addLog("error", `그래프 삭제 실패: ${String(err)}`);
-      }
+      await deleteGraph(conn, id);
+      const updatedList = await listGraphs(conn);
+      setGraphList(updatedList);
     },
-    [conn, setGraphList, addLog]
+    [conn, setGraphList]
   );
 
   const currentYaml = showYaml
@@ -326,16 +307,6 @@ export function App({ hass }: AppProps) {
                 </>
               )}
 
-              <button
-                onClick={() => setShowDebug(!showDebug)}
-                style={{
-                  ...secondaryBtnStyle(isMobile),
-                  color: showDebug ? "#60a5fa" : "#64748b",
-                  borderColor: showDebug ? "#3b82f6" : "#334155",
-                }}
-              >
-                {isMobile ? "🐛" : t.debug}
-              </button>
             </div>
 
             {/* Content */}
@@ -389,9 +360,6 @@ export function App({ hass }: AppProps) {
                 />
               )}
 
-              {showDebug && (
-                <DebugPanel isMobile={isMobile} panelWidth={panelWidth} />
-              )}
             </div>
           </>
         )}

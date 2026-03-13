@@ -97,7 +97,6 @@ function GraphEditorInner({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditor
     updateNodes,
     updateEdges,
     addNode,
-    addLog,
   } = useGraphStore();
 
   const { screenToFlowPosition } = useReactFlow();
@@ -131,11 +130,10 @@ function GraphEditorInner({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditor
         data: { match: "*", mode: "sequential" },
         id: `${params.source}->${params.target}-${Date.now()}`,
       };
-      addLog("info", `엣지 연결: ${params.source} → ${params.target}`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       updateEdges(addEdge(edge as any, flowEdges));
     },
-    [flowEdges, updateEdges, addLog]
+    [flowEdges, updateEdges]
   );
 
   const onDrop = useCallback(
@@ -143,15 +141,11 @@ function GraphEditorInner({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditor
       event.preventDefault();
       const type = _draggedNodeType;
       _draggedNodeType = null;
-      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      addLog(
-        type ? "info" : "warn",
-        `[drop] nodeType="${type || "(없음)"}" | screen=(${event.clientX},${event.clientY}) | flow=(${Math.round(position.x)},${Math.round(position.y)})`
-      );
       if (!type) return;
+      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       addNode(type, position);
     },
-    [screenToFlowPosition, addNode, addLog]
+    [screenToFlowPosition, addNode]
   );
 
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -201,7 +195,6 @@ function GraphEditorInner({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditor
 }
 
 function NodePalette() {
-  const { addLog } = useGraphStore();
   const t = useLang();
   const inputRef = useRef<HTMLDivElement>(null);
   const routerRef = useRef<HTMLDivElement>(null);
@@ -222,35 +215,25 @@ function NodePalette() {
         e.dataTransfer.setData("nodeType", type);
         e.dataTransfer.effectAllowed = "move";
       }
-      addLog("info", `[dragstart] type="${type}"`);
-    };
-
-    const makeDragEnd = (type: string) => (e: DragEvent) => {
-      addLog(
-        e.dataTransfer?.dropEffect === "none" ? "warn" : "info",
-        `[dragend] type="${type}" | dropEffect="${e.dataTransfer?.dropEffect}" (none=드롭 실패)`
-      );
     };
 
     const listeners = [
-      { el: inputEl, start: makeDragStart("input"), end: makeDragEnd("input") },
-      { el: routerEl, start: makeDragStart("router"), end: makeDragEnd("router") },
-      { el: agentEl, start: makeDragStart("regular"), end: makeDragEnd("regular") },
-      { el: outputEl, start: makeDragStart("output"), end: makeDragEnd("output") },
+      { el: inputEl, start: makeDragStart("input") },
+      { el: routerEl, start: makeDragStart("router") },
+      { el: agentEl, start: makeDragStart("regular") },
+      { el: outputEl, start: makeDragStart("output") },
     ];
 
-    listeners.forEach(({ el, start, end }) => {
+    listeners.forEach(({ el, start }) => {
       el?.addEventListener("dragstart", start);
-      el?.addEventListener("dragend", end);
     });
 
     return () => {
-      listeners.forEach(({ el, start, end }) => {
+      listeners.forEach(({ el, start }) => {
         el?.removeEventListener("dragstart", start);
-        el?.removeEventListener("dragend", end);
       });
     };
-  }, [addLog]);
+  }, []);
 
   const paletteItemStyle = (bg: string, border: string): React.CSSProperties => ({
     background: bg,
