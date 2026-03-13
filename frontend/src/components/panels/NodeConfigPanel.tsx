@@ -14,7 +14,7 @@ interface NodeConfigPanelProps {
 }
 
 export function NodeConfigPanel({ conn, onClose, isMobile, panelWidth = 380 }: NodeConfigPanelProps) {
-  const { flowNodes, selectedNodeId, updateNodeData, updateNodes, deleteNode } = useGraphStore();
+  const { flowNodes, flowEdges, selectedNodeId, updateNodeData, updateNodes, deleteNode } = useGraphStore();
   const t = useLang();
   const selectedNode = flowNodes.find((n) => n.id === selectedNodeId);
 
@@ -129,23 +129,104 @@ export function NodeConfigPanel({ conn, onClose, isMobile, panelWidth = 380 }: N
                 : "연결된 노드의 출력이 대화 에이전트 응답으로 반환됩니다."}
             </div>
 
-            {data.type === "output" && (
-              <div style={{ marginTop: 12 }}>
-                <label style={{ display: "block", color: "#94a3b8", fontSize: 11, marginBottom: 4 }}>
-                  {t.outputTemplate}
-                </label>
-                <textarea
-                  value={data.output_template ?? ""}
-                  onChange={(e) => update("output_template", e.target.value || undefined)}
-                  placeholder={"예: {{ node_outputs['agent_a'] }}\n또는: A: {{ variables['agent_a.answer'] }}"}
-                  rows={4}
-                  style={{ ...inputStyle, fontFamily: "monospace", resize: "vertical" }}
-                />
-                <div style={{ color: "#334155", fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>
-                  {t.outputTemplateHint}
+            {data.type === "output" && (() => {
+              const incomingNodes = flowEdges
+                .filter((e) => e.target === selectedNodeId)
+                .map((e) => flowNodes.find((n) => n.id === e.source))
+                .filter(Boolean);
+              return (
+                <div style={{ marginTop: 12 }}>
+                  <label style={{ display: "block", color: "#94a3b8", fontSize: 11, marginBottom: 4 }}>
+                    {t.outputTemplate}
+                  </label>
+                  {incomingNodes.length > 0 && (
+                    <div
+                      style={{
+                        background: "#0a0f1e",
+                        border: "1px solid #1e293b",
+                        borderRadius: 6,
+                        padding: "8px 10px",
+                        marginBottom: 8,
+                      }}
+                    >
+                      <div style={{ color: "#64748b", fontSize: 10, fontWeight: 700, marginBottom: 6, letterSpacing: "0.05em" }}>
+                        연결된 노드 (템플릿에서 사용 가능)
+                      </div>
+                      {incomingNodes.map((n) => {
+                        const nd = n!.data as unknown as GraphNode;
+                        const nodeId = n!.id;
+                        const nodeName = nd.name ?? nodeId;
+                        return (
+                          <div key={nodeId} style={{ marginBottom: 6 }}>
+                            <div style={{ color: "#94a3b8", fontSize: 11, marginBottom: 2 }}>
+                              <span style={{ color: "#c4b5fd" }}>{nodeName}</span>
+                              <span style={{ color: "#334155" }}> (ID: </span>
+                              <span style={{ color: "#7dd3fc", fontFamily: "monospace" }}>{nodeId}</span>
+                              <span style={{ color: "#334155" }}>)</span>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                              <code
+                                onClick={() => {
+                                  const tmpl = `{{ node_outputs['${nodeId}'] }}`;
+                                  update("output_template", (data.output_template ? data.output_template + "\n" : "") + tmpl);
+                                }}
+                                style={{
+                                  background: "#1e293b",
+                                  color: "#86efac",
+                                  fontSize: 10,
+                                  padding: "2px 6px",
+                                  borderRadius: 4,
+                                  cursor: "pointer",
+                                  display: "block",
+                                  fontFamily: "monospace",
+                                }}
+                                title="클릭하여 삽입"
+                              >
+                                {"{{ node_outputs['" + nodeId + "'] }}"} <span style={{ color: "#475569" }}>← 전체 출력</span>
+                              </code>
+                              {nd.output_schema && nd.output_schema.length > 0 && nd.output_schema.map((field) => (
+                                <code
+                                  key={field.key}
+                                  onClick={() => {
+                                    const tmpl = `{{ variables['${nodeId}.${field.key}'] }}`;
+                                    update("output_template", (data.output_template ? data.output_template + "\n" : "") + tmpl);
+                                  }}
+                                  style={{
+                                    background: "#1e293b",
+                                    color: "#fbbf24",
+                                    fontSize: 10,
+                                    padding: "2px 6px",
+                                    borderRadius: 4,
+                                    cursor: "pointer",
+                                    display: "block",
+                                    fontFamily: "monospace",
+                                  }}
+                                  title="클릭하여 삽입"
+                                >
+                                  {"{{ variables['" + nodeId + "." + field.key + "'] }}"} <span style={{ color: "#475569" }}>← {field.key}</span>
+                                </code>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div style={{ color: "#334155", fontSize: 10, marginTop: 4 }}>
+                        💡 코드를 클릭하면 템플릿에 삽입됩니다
+                      </div>
+                    </div>
+                  )}
+                  <textarea
+                    value={data.output_template ?? ""}
+                    onChange={(e) => update("output_template", e.target.value || undefined)}
+                    rows={4}
+                    style={{ ...inputStyle, fontFamily: "monospace", resize: "vertical" }}
+                  />
+                  <div style={{ color: "#334155", fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>
+                    {t.outputTemplateHint}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </>
         )}
 

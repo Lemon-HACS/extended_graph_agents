@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { GraphList } from "./components/panels/GraphList";
 import { SkillsPanel } from "./components/panels/SkillsPanel";
+import { SkillWorkspace } from "./components/panels/SkillWorkspace";
 import { GraphEditor } from "./components/GraphEditor";
 import { NodeConfigPanel } from "./components/panels/NodeConfigPanel";
 import { EdgeConfigPanel } from "./components/panels/EdgeConfigPanel";
@@ -55,6 +56,7 @@ export function App({ hass }: AppProps) {
     if (!isMobile) setShowSidebar(false);
   }, [isMobile]);
 
+
   const conn = hass.connection;
 
   // Load graph list and skill list on mount
@@ -108,6 +110,18 @@ export function App({ hass }: AppProps) {
       setIsSaving(false);
     }
   }, [conn, getCurrentGraphDef, setGraphList, setIsSaving, addLog]);
+
+  // Ctrl+S 단축키로 그래프 저장
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s" && sidebarView === "graphs") {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [sidebarView, handleSave]);
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -243,134 +257,144 @@ export function App({ hass }: AppProps) {
       <div
         style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
       >
-        {/* Top bar */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            padding: isMobile ? "6px 10px" : "8px 16px",
-            borderBottom: "1px solid #1e293b",
-            background: "#0a0f1e",
-            gap: isMobile ? 8 : 12,
-            flexShrink: 0,
-          }}
-        >
-          {/* Hamburger (mobile only) */}
-          {isMobile && (
-            <button
-              onClick={() => setShowSidebar(true)}
+        {sidebarView === "skills" ? (
+          <SkillWorkspace
+            conn={conn}
+            isMobile={isMobile}
+            onOpenSidebar={() => setShowSidebar(true)}
+          />
+        ) : (
+          <>
+            {/* Top bar */}
+            <div
               style={{
-                background: "none",
-                border: "none",
-                color: "#94a3b8",
-                cursor: "pointer",
-                fontSize: 20,
-                lineHeight: 1,
-                padding: "4px",
+                display: "flex",
+                alignItems: "center",
+                padding: isMobile ? "6px 10px" : "8px 16px",
+                borderBottom: "1px solid #1e293b",
+                background: "#0a0f1e",
+                gap: isMobile ? 8 : 12,
                 flexShrink: 0,
               }}
             >
-              ☰
-            </button>
-          )}
+              {/* Hamburger (mobile only) */}
+              {isMobile && (
+                <button
+                  onClick={() => setShowSidebar(true)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#94a3b8",
+                    cursor: "pointer",
+                    fontSize: 20,
+                    lineHeight: 1,
+                    padding: "4px",
+                    flexShrink: 0,
+                  }}
+                >
+                  ☰
+                </button>
+              )}
 
-          {currentGraph ? (
-            <GraphMetaEditor isMobile={isMobile} />
-          ) : (
-            <div style={{ flex: 1 }} />
-          )}
+              {currentGraph ? (
+                <GraphMetaEditor isMobile={isMobile} />
+              ) : (
+                <div style={{ flex: 1 }} />
+              )}
 
-          <div style={{ flex: 1 }} />
+              <div style={{ flex: 1 }} />
 
-          {currentGraph && (
-            <>
+              {currentGraph && (
+                <>
+                  <button
+                    onClick={() => setShowYaml(!showYaml)}
+                    style={secondaryBtnStyle(isMobile)}
+                  >
+                    {showYaml ? t.backToGraph : t.yaml}
+                  </button>
+
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving || !isDirty}
+                    style={{
+                      ...primaryBtnStyle(isMobile),
+                      opacity: isSaving || !isDirty ? 0.5 : 1,
+                    }}
+                  >
+                    {isSaving ? t.saving : isDirty ? t.save : t.saved}
+                  </button>
+                </>
+              )}
+
               <button
-                onClick={() => setShowYaml(!showYaml)}
-                style={secondaryBtnStyle(isMobile)}
-              >
-                {showYaml ? t.backToGraph : t.yaml}
-              </button>
-
-              <button
-                onClick={handleSave}
-                disabled={isSaving || !isDirty}
+                onClick={() => setShowDebug(!showDebug)}
                 style={{
-                  ...primaryBtnStyle(isMobile),
-                  opacity: isSaving || !isDirty ? 0.5 : 1,
+                  ...secondaryBtnStyle(isMobile),
+                  color: showDebug ? "#60a5fa" : "#64748b",
+                  borderColor: showDebug ? "#3b82f6" : "#334155",
                 }}
               >
-                {isSaving ? t.saving : isDirty ? t.save : t.saved}
+                {isMobile ? "🐛" : t.debug}
               </button>
-            </>
-          )}
-
-          <button
-            onClick={() => setShowDebug(!showDebug)}
-            style={{
-              ...secondaryBtnStyle(isMobile),
-              color: showDebug ? "#60a5fa" : "#64748b",
-              borderColor: showDebug ? "#3b82f6" : "#334155",
-            }}
-          >
-            {isMobile ? "🐛" : t.debug}
-          </button>
-        </div>
-
-        {/* Content */}
-        <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative", minHeight: 0 }}>
-          {showYaml ? (
-            <div style={{ flex: 1, padding: 16, overflow: "auto" }}>
-              <pre
-                style={{
-                  background: "#0f172a",
-                  border: "1px solid #1e293b",
-                  borderRadius: 8,
-                  padding: 16,
-                  color: "#e2e8f0",
-                  fontFamily: "monospace",
-                  fontSize: 13,
-                  margin: 0,
-                }}
-              >
-                {currentYaml}
-              </pre>
             </div>
-          ) : (
-            <GraphEditor
-              onNodeClick={(id) => {
-                selectNode(id === selectedNodeId ? null : id);
-              }}
-              onEdgeClick={(id) => {
-                selectEdge(id === selectedEdgeId ? null : id);
-              }}
-              onPaneClick={() => {
-                selectNode(null);
-                selectEdge(null);
-              }}
-            />
-          )}
 
-          {selectedNodeId && !showYaml && (
-            <NodeConfigPanel
-              conn={conn}
-              onClose={() => selectNode(null)}
-              isMobile={isMobile}
-              panelWidth={panelWidth}
-            />
-          )}
+            {/* Content */}
+            <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative", minHeight: 0 }}>
+              {showYaml ? (
+                <div style={{ flex: 1, padding: 16, overflow: "auto" }}>
+                  <pre
+                    style={{
+                      background: "#0f172a",
+                      border: "1px solid #1e293b",
+                      borderRadius: 8,
+                      padding: 16,
+                      color: "#e2e8f0",
+                      fontFamily: "monospace",
+                      fontSize: 13,
+                      margin: 0,
+                    }}
+                  >
+                    {currentYaml}
+                  </pre>
+                </div>
+              ) : (
+                <GraphEditor
+                  onNodeClick={(id) => {
+                    selectNode(id === selectedNodeId ? null : id);
+                  }}
+                  onEdgeClick={(id) => {
+                    selectEdge(id === selectedEdgeId ? null : id);
+                  }}
+                  onPaneClick={() => {
+                    selectNode(null);
+                    selectEdge(null);
+                  }}
+                />
+              )}
 
-          {selectedEdgeId && !showYaml && !selectedNodeId && (
-            <EdgeConfigPanel
-              onClose={() => selectEdge(null)}
-              isMobile={isMobile}
-              panelWidth={panelWidth}
-            />
-          )}
+              {selectedNodeId && !showYaml && (
+                <NodeConfigPanel
+                  conn={conn}
+                  onClose={() => selectNode(null)}
+                  isMobile={isMobile}
+                  panelWidth={panelWidth}
+                />
+              )}
 
-          {showDebug && (
-            <DebugPanel isMobile={isMobile} panelWidth={panelWidth} />
-          )}
-        </div>
+              {selectedEdgeId && !showYaml && !selectedNodeId && (
+                <EdgeConfigPanel
+                  onClose={() => selectEdge(null)}
+                  isMobile={isMobile}
+                  panelWidth={panelWidth}
+                />
+              )}
+
+              {showDebug && (
+                <DebugPanel isMobile={isMobile} panelWidth={panelWidth} />
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
     </LangContext.Provider>
