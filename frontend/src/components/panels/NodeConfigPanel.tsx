@@ -440,9 +440,14 @@ function PromptField({
     }
   };
 
-  const filteredEntities = entities.filter((e) =>
-    e.entity_id.toLowerCase().includes(entitySearch.toLowerCase())
-  );
+  const filteredEntities = entities.filter((e) => {
+    const q = entitySearch.toLowerCase();
+    const friendlyName = (e.attributes?.friendly_name as string | undefined) ?? "";
+    return (
+      e.entity_id.toLowerCase().includes(q) ||
+      friendlyName.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div style={{ marginBottom: 12 }}>
@@ -606,8 +611,15 @@ function PromptField({
                       ((e.currentTarget as HTMLDivElement).style.background = "transparent")
                     }
                   >
-                    <div style={{ fontSize: 12, color: "#e2e8f0", fontFamily: "monospace" }}>
-                      {entity.entity_id}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: "#e2e8f0", fontFamily: "monospace" }}>
+                        {entity.entity_id}
+                      </div>
+                      {(entity.attributes?.friendly_name as string | undefined) && (
+                        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>
+                          {entity.attributes.friendly_name as string}
+                        </div>
+                      )}
                     </div>
                     <div
                       style={{
