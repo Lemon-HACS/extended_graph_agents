@@ -81,6 +81,19 @@ export async function renderTemplate(conn: HassConnection, template: string): Pr
   return result.result;
 }
 
+export async function runGraph(
+  conn: HassConnection,
+  graphId: string,
+  userInput: string
+): Promise<import("../types").DebugRunResult> {
+  const result = await conn.sendMessagePromise({
+    type: `${DOMAIN}/run_graph`,
+    graph_id: graphId,
+    user_input: userInput,
+  }) as import("../types").DebugRunResult;
+  return result;
+}
+
 export interface HassEntityState {
   entity_id: string;
   state: string;

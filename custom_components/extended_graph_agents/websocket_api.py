@@ -25,6 +25,7 @@ def async_setup_websocket_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_save_skill)
     websocket_api.async_register_command(hass, ws_delete_skill)
     websocket_api.async_register_command(hass, ws_render_template)
+    websocket_api.async_register_command(hass, ws_run_graph)
 
 
 def _get_skill_loader(hass: HomeAssistant) -> SkillLoader:
@@ -251,3 +252,79 @@ def ws_delete_skill(
         connection.send_result(msg["id"], {"success": True})
     except SkillNotFound as err:
         connection.send_error(msg["id"], "skill_not_found", str(err))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/run_graph",
+    vol.Required("graph_id"): str,
+    vol.Required("user_input"): str,
+    vol.Optional("language", default="en"): str,
+})
+@websocket_api.async_response
+async def ws_run_graph(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Run a graph with the given user input and return full execution trace."""
+    import uuid
+    from pathlib import Path
+    from .graph_engine import GraphEngine, ExecutionEvent
+    from .graph_state import GraphState
+    from .helpers import get_exposed_entities
+    from .exceptions import GraphNotFound, GraphExecutionError
+    from .const import GRAPHS_SUBDIR, DEFAULT_CHAT_MODEL
+
+    entries = hass.config_entries.async_entries(DOMAIN)
+    if not entries:
+        connection.send_error(msg["id"], "no_config", "No Extended Graph Agents config entry found")
+        return
+    client = entries[0].runtime_data
+
+    graphs_dir_path = Path(hass.config.config_dir) / GRAPHS_SUBDIR
+    loader = _get_loader(hass)
+
+    trace: list[dict] = []
+
+    def on_event(event: ExecutionEvent) -> None:
+        trace.append({"type": event.event_type, **event.data})
+
+    try:
+        graph = loader.load_by_id(msg["graph_id"])
+    except GraphNotFound as err:
+        connection.send_error(msg["id"], "graph_not_found", str(err))
+        return
+
+    state = GraphState(
+        user_input=msg["user_input"],
+        conversation_id=str(uuid.uuid4()),
+        language=msg.get("language", "en"),
+    )
+
+    exposed_entities = get_exposed_entities(hass)
+
+    try:
+        engine = GraphEngine(
+            hass=hass,
+            client=client,
+            default_model=graph.model or DEFAULT_CHAT_MODEL,
+            event_callback=on_event,
+        )
+        output = await engine.execute(graph, state, exposed_entities)
+    except GraphExecutionError as err:
+        connection.send_result(msg["id"], {
+            "trace": trace,
+            "output": None,
+            "error": str(err),
+        })
+        return
+    except Exception as err:
+        connection.send_error(msg["id"], "execution_failed", str(err))
+        return
+
+    connection.send_result(msg["id"], {
+        "trace": trace,
+        "output": output,
+        "error": None,
+    })

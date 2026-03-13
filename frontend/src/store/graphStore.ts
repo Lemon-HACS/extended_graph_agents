@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Node, Edge } from "@xyflow/react";
-import type { GraphDefinition, GraphSummary } from "../types";
+import type { GraphDefinition, GraphSummary, TraceEvent, DebugRunResult } from "../types";
 import { graphToFlow, flowToGraph } from "../utils/serializer";
 
 interface GraphStore {
@@ -20,6 +20,15 @@ interface GraphStore {
   // UI state
   isDirty: boolean;
   isSaving: boolean;
+
+  // Debug
+  debugMode: boolean;
+  debugRunning: boolean;
+  debugResult: DebugRunResult | null;
+  highlightedNodeIds: Set<string>;
+  toggleDebugMode: () => void;
+  setDebugRunning: (running: boolean) => void;
+  setDebugResult: (result: DebugRunResult | null) => void;
 
   // Actions
   loadGraph: (graph: GraphDefinition) => void;
@@ -48,6 +57,33 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   selectedEdgeId: null,
   isDirty: false,
   isSaving: false,
+
+  debugMode: false,
+  debugRunning: false,
+  debugResult: null,
+  highlightedNodeIds: new Set<string>(),
+
+  toggleDebugMode: () => set((state) => ({
+    debugMode: !state.debugMode,
+    debugResult: null,
+    highlightedNodeIds: new Set<string>(),
+    selectedNodeId: null,
+    selectedEdgeId: null,
+  })),
+
+  setDebugRunning: (running) => set({ debugRunning: running }),
+
+  setDebugResult: (result) => {
+    const highlighted = new Set<string>();
+    if (result?.trace) {
+      for (const ev of result.trace) {
+        if (ev.type === "node_finished" || ev.type === "node_error") {
+          if (ev.node_id) highlighted.add(ev.node_id);
+        }
+      }
+    }
+    set({ debugResult: result, highlightedNodeIds: highlighted, debugRunning: false });
+  },
 
   loadGraph: (graph) => {
     // Restore saved positions from localStorage

@@ -6,6 +6,7 @@ import { GraphEditor } from "./components/GraphEditor";
 import { NodeConfigPanel } from "./components/panels/NodeConfigPanel";
 import { EdgeConfigPanel } from "./components/panels/EdgeConfigPanel";
 import { GraphSettingsPanel } from "./components/panels/GraphSettingsPanel";
+import { DebugRunPanel } from "./components/panels/DebugRunPanel";
 import { useGraphStore } from "./store/graphStore";
 import { useSkillStore } from "./store/skillStore";
 import { listGraphs, getGraph, saveGraph, deleteGraph, listSkills } from "./utils/haApi";
@@ -44,6 +45,8 @@ export function App({ hass }: AppProps) {
     isSaving,
     setIsSaving,
     getCurrentGraphDef,
+    debugMode,
+    toggleDebugMode,
   } = useGraphStore();
 
   const { isMobile, isTablet } = useWindowSize();
@@ -306,6 +309,17 @@ export function App({ hass }: AppProps) {
                   </button>
 
                   <button
+                    onClick={toggleDebugMode}
+                    style={{
+                      ...secondaryBtnStyle(isMobile),
+                      color: debugMode ? "#f59e0b" : "#64748b",
+                      borderColor: debugMode ? "#d97706" : "#334155",
+                    }}
+                  >
+                    🐛
+                  </button>
+
+                  <button
                     onClick={handleSave}
                     disabled={isSaving || !isDirty}
                     style={{
@@ -354,7 +368,7 @@ export function App({ hass }: AppProps) {
                 />
               )}
 
-              {selectedNodeId && !showYaml && (
+              {selectedNodeId && !showYaml && !debugMode && (
                 <NodeConfigPanel
                   conn={conn}
                   onClose={() => selectNode(null)}
@@ -363,7 +377,7 @@ export function App({ hass }: AppProps) {
                 />
               )}
 
-              {selectedEdgeId && !showYaml && !selectedNodeId && (
+              {selectedEdgeId && !showYaml && !selectedNodeId && !debugMode && (
                 <EdgeConfigPanel
                   onClose={() => selectEdge(null)}
                   isMobile={isMobile}
@@ -371,7 +385,16 @@ export function App({ hass }: AppProps) {
                 />
               )}
 
-              {showGraphSettings && !showYaml && !selectedNodeId && !selectedEdgeId && (
+              {debugMode && !showYaml && (
+                <DebugRunPanel
+                  conn={conn}
+                  onClose={toggleDebugMode}
+                  isMobile={isMobile}
+                  panelWidth={panelWidth}
+                />
+              )}
+
+              {showGraphSettings && !showYaml && !selectedNodeId && !selectedEdgeId && !debugMode && (
                 <GraphSettingsPanel
                   onClose={() => setShowGraphSettings(false)}
                   isMobile={isMobile}

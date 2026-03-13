@@ -184,6 +184,12 @@ class RegularNode(BaseNode):
                 if func_config is None:
                     tool_result = f"Function {func_name} not found"
                 else:
+                    if state.event_callback:
+                        state.event_callback("tool_called", {
+                            "node_id": self.node_id,
+                            "tool_name": func_name,
+                            "args": args,
+                        })
                     func_impl = get_function(func_config["function"]["type"])
                     result = await func_impl.execute(
                         hass,
@@ -193,6 +199,12 @@ class RegularNode(BaseNode):
                         exposed_entities,
                     )
                     tool_result = str(result)
+                    if state.event_callback:
+                        state.event_callback("tool_result", {
+                            "node_id": self.node_id,
+                            "tool_name": func_name,
+                            "result": tool_result[:2000],
+                        })
 
                 messages.append({
                     "role": "tool",

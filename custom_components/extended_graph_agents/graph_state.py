@@ -1,7 +1,7 @@
 """Graph execution state."""
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 
 @dataclass
@@ -14,6 +14,7 @@ class GraphState:
     variables: dict[str, Any] = field(default_factory=dict)
     node_outputs: dict[str, str] = field(default_factory=dict)  # node_id -> output text
     messages: list[dict[str, Any]] = field(default_factory=list)
+    event_callback: Callable[[str, dict[str, Any]], None] | None = field(default=None)
 
     def get(self, key: str, default: Any = None) -> Any:
         if key == "user_input":

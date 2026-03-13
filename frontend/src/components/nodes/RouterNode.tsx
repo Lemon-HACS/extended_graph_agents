@@ -1,20 +1,22 @@
 import { Handle, Position } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
 import type { GraphNode } from "../../types";
+import { useGraphStore } from "../../store/graphStore";
 
-export function RouterNode({ data, selected }: NodeProps) {
+export function RouterNode({ data, selected, id }: NodeProps) {
   const node = data as unknown as GraphNode;
+  const highlighted = useGraphStore((s) => s.highlightedNodeIds.has(id));
 
   return (
     <div
       style={{
-        background: selected ? "#1e3a5f" : "#1a3050",
-        border: `2px solid ${selected ? "#60a5fa" : "#3b82f6"}`,
+        background: selected ? "#1e3a5f" : highlighted ? "#1a3560" : "#1a3050",
+        border: `2px solid ${selected ? "#60a5fa" : highlighted ? "#93c5fd" : "#3b82f6"}`,
         borderRadius: 10,
         padding: "12px 16px",
         minWidth: 180,
         color: "white",
-        boxShadow: selected ? "0 0 0 2px rgba(96,165,250,0.4)" : "none",
+        boxShadow: selected ? "0 0 0 2px rgba(96,165,250,0.4)" : highlighted ? "0 0 0 3px rgba(147,197,253,0.5)" : "none",
       }}
     >
       <Handle

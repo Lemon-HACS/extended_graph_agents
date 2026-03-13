@@ -2,6 +2,7 @@
 from __future__ import annotations
 import asyncio
 import logging
+import time
 from typing import Any, Callable
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import llm
@@ -20,7 +21,7 @@ class ExecutionEvent:
     """Emitted during graph execution for tracing."""
 
     def __init__(self, event_type: str, data: dict[str, Any]):
-        self.event_type = event_type  # node_started, node_finished, graph_finished
+        self.event_type = event_type
         self.data = data
 
 
@@ -51,10 +52,13 @@ class GraphEngine:
             if "model" not in node_config:
                 node_config["model"] = graph.model or self.default_model
 
+        # Pass event callback to state so nodes can emit tool events
+        if self.event_callback:
+            state.event_callback = lambda etype, data: self._emit(ExecutionEvent(etype, data))
+
         start_node_config = graph.get_start_node()
 
         steps = 0
-        # Queue of (node_ids_to_execute, execution_mode)
         pending: list[tuple[list[str], str]] = [([start_node_config["id"]], "sequential")]
 
         while pending and steps < MAX_GRAPH_STEPS:
@@ -65,7 +69,6 @@ class GraphEngine:
                 results = await self._execute_parallel(
                     graph, node_ids, state, exposed_entities, llm_context
                 )
-                # Fan-in: collect next batches from all parallel branches, deduplicating targets.
                 seen_next: set[str] = set()
                 fan_in_next: list[str] = []
                 for result in results:
@@ -92,16 +95,6 @@ class GraphEngine:
         node_id: str,
         state: GraphState,
     ) -> list[tuple[list[str], str]]:
-        """Determine the next execution batches based on outgoing edges.
-
-        Conditional edges are evaluated against state variables.
-        Unconditional edges act as default fallback — they fire only when
-        no conditional edge matched. This allows clean router default routes.
-
-        Returns a list of (node_ids, mode) tuples to enqueue.
-        Parallel-mode targets are grouped into one batch; each sequential
-        target becomes its own batch.
-        """
         outgoing = graph.get_outgoing_edges(node_id)
         if not outgoing:
             return []
@@ -114,8 +107,6 @@ class GraphEngine:
             if str(state.get(e.condition["variable"], "")) == str(e.condition["value"])
         ]
 
-        # Exclusive fallback: if any conditional matched, fire those.
-        # Otherwise fire unconditional edges as the default path.
         firing = matched if matched else unconditional
         if not firing:
             return []
@@ -132,15 +123,12 @@ class GraphEngine:
         return batches
 
     def _collect_final_output(self, graph: GraphDefinition, state: GraphState) -> str:
-        """Determine the final output text from the executed graph."""
         output_node = graph.output_node
         if output_node is not None:
-            # If output node rendered a template, use that directly
             output_node_id = output_node["id"]
             if state.node_outputs.get(output_node_id):
                 return state.node_outputs[output_node_id]
 
-            # Otherwise fall back to the first non-empty incoming node's output
             incoming_sources = [
                 e.source for e in graph.edges if e.target == output_node_id
             ]
@@ -148,13 +136,11 @@ class GraphEngine:
                 if src_id in state.node_outputs and state.node_outputs[src_id]:
                     return state.node_outputs[src_id]
 
-        # Fallback: last regular node in reverse order
         for node_config in reversed(graph.nodes):
             node_id = node_config["id"]
             if node_id in state.node_outputs and node_config.get("type") == "regular":
                 return state.node_outputs[node_id]
 
-        # Last resort: any last output
         if state.node_outputs:
             return list(state.node_outputs.values())[-1]
 
@@ -172,10 +158,11 @@ class GraphEngine:
         if node_config is None:
             raise NodeNotFound(node_id)
 
+        t_start = time.monotonic()
         self._emit(
             ExecutionEvent(
                 "node_started",
-                {"node_id": node_id, "node_type": node_config.get("type")},
+                {"node_id": node_id, "node_type": node_config.get("type"), "node_name": node_config.get("name", node_id)},
             )
         )
 
@@ -184,17 +171,27 @@ class GraphEngine:
             result = await node.execute(
                 state, self.hass, self.client, exposed_entities, llm_context
             )
+            duration_ms = int((time.monotonic() - t_start) * 1000)
             self._emit(
                 ExecutionEvent(
                     "node_finished",
                     {
                         "node_id": node_id,
-                        "output": result.output[:200],
+                        "output": result.output,
+                        "duration_ms": duration_ms,
+                        "variables_set": result.variables_set,
                     },
                 )
             )
             return result
         except Exception as err:
+            duration_ms = int((time.monotonic() - t_start) * 1000)
+            self._emit(
+                ExecutionEvent(
+                    "node_error",
+                    {"node_id": node_id, "error": str(err), "duration_ms": duration_ms},
+                )
+            )
             _LOGGER.error("Node '%s' failed: %s", node_id, err, exc_info=True)
             raise GraphExecutionError(f"Node '{node_id}' failed: {err}") from err
 
