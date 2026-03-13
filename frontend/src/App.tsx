@@ -295,6 +295,17 @@ export function App({ hass }: AppProps) {
                   </button>
 
                   <button
+                    onClick={() => setShowGraphSettings(!showGraphSettings)}
+                    style={{
+                      ...secondaryBtnStyle(isMobile),
+                      color: showGraphSettings ? "#60a5fa" : "#94a3b8",
+                      borderColor: showGraphSettings ? "#3b82f6" : "#334155",
+                    }}
+                  >
+                    ⚙️
+                  </button>
+
+                  <button
                     onClick={handleSave}
                     disabled={isSaving || !isDirty}
                     style={{
@@ -355,6 +366,14 @@ export function App({ hass }: AppProps) {
               {selectedEdgeId && !showYaml && !selectedNodeId && (
                 <EdgeConfigPanel
                   onClose={() => selectEdge(null)}
+                  isMobile={isMobile}
+                  panelWidth={panelWidth}
+                />
+              )}
+
+              {showGraphSettings && !showYaml && !selectedNodeId && !selectedEdgeId && (
+                <GraphSettingsPanel
+                  onClose={() => setShowGraphSettings(false)}
                   isMobile={isMobile}
                   panelWidth={panelWidth}
                 />
