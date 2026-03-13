@@ -46,6 +46,8 @@ export interface GraphNode {
   functions?: FunctionTool[];
   skills?: string[];
   output_schema?: OutputSchemaField[];  // JSON structured output mode
+  // Output node specific
+  output_template?: string;
   // UI position (not saved to YAML)
   position?: { x: number; y: number };
 }

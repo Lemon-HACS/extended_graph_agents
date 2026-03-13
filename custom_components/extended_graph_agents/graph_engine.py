@@ -135,9 +135,14 @@ class GraphEngine:
         """Determine the final output text from the executed graph."""
         output_node = graph.output_node
         if output_node is not None:
-            # Find nodes that have edges pointing to the output node
+            # If output node rendered a template, use that directly
+            output_node_id = output_node["id"]
+            if state.node_outputs.get(output_node_id):
+                return state.node_outputs[output_node_id]
+
+            # Otherwise fall back to the first non-empty incoming node's output
             incoming_sources = [
-                e.source for e in graph.edges if e.target == output_node["id"]
+                e.source for e in graph.edges if e.target == output_node_id
             ]
             for src_id in incoming_sources:
                 if src_id in state.node_outputs and state.node_outputs[src_id]:

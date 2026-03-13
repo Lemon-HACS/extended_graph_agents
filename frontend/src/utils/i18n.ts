@@ -75,6 +75,8 @@ const en = {
   connectInCanvas: "Draw connections in the canvas to add routes",
   conditionVariable: "Condition Variable",
   conditionValue: "Condition Value",
+  outputTemplate: "Output Template (optional)",
+  outputTemplateHint: "Jinja2 template for final response. Leave blank to use the first incoming node's output.",
 
   // Dialogs
   confirmDelete: (id: string) => `Delete graph "${id}"?`,
@@ -220,6 +222,8 @@ const ko: typeof en = {
   connectInCanvas: "캔버스에서 노드를 연결하여 라우트를 추가하세요",
   conditionVariable: "조건 변수",
   conditionValue: "조건 값",
+  outputTemplate: "출력 템플릿 (선택)",
+  outputTemplateHint: "최종 응답을 Jinja2 템플릿으로 조합합니다. 비워두면 연결된 첫 번째 노드의 출력을 사용합니다.",
 
   // Dialogs
   confirmDelete: (id: string) => `"${id}" 그래프를 삭제하시겠습니까?`,

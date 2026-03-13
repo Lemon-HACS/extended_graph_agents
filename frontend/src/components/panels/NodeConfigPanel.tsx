@@ -107,7 +107,7 @@ export function NodeConfigPanel({ conn, onClose, isMobile, panelWidth = 380 }: N
 
       {/* Scrollable content */}
       <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-        {/* Input/Output nodes: minimal config */}
+        {/* Input/Output nodes */}
         {(data.type === "input" || data.type === "output") && (
           <>
             <Field label={t.nodeId}>
@@ -128,6 +128,24 @@ export function NodeConfigPanel({ conn, onClose, isMobile, panelWidth = 380 }: N
                 ? "사용자 메시지가 여기서 시작됩니다.\n연결된 노드에서 {{ user_input }}으로 접근할 수 있습니다."
                 : "연결된 노드의 출력이 대화 에이전트 응답으로 반환됩니다."}
             </div>
+
+            {data.type === "output" && (
+              <div style={{ marginTop: 12 }}>
+                <label style={{ display: "block", color: "#94a3b8", fontSize: 11, marginBottom: 4 }}>
+                  {t.outputTemplate}
+                </label>
+                <textarea
+                  value={data.output_template ?? ""}
+                  onChange={(e) => update("output_template", e.target.value || undefined)}
+                  placeholder={"예: {{ node_outputs['agent_a'] }}\n또는: A: {{ variables['agent_a.answer'] }}"}
+                  rows={4}
+                  style={{ ...inputStyle, fontFamily: "monospace", resize: "vertical" }}
+                />
+                <div style={{ color: "#334155", fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>
+                  {t.outputTemplateHint}
+                </div>
+              </div>
+            )}
           </>
         )}
 
