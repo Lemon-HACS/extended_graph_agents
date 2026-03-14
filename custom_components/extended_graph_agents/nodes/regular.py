@@ -30,12 +30,17 @@ class RegularNode(BaseNode):
 
         config = self.config
         model = config.get("model", "gpt-4o")
+        model_params: dict[str, Any] = config.get("model_params") or {}
+        system_prompt_prefix: str = config.get("system_prompt_prefix", "")
+        max_tool_iterations: int = config.get("max_tool_iterations", MAX_TOOL_ITERATIONS)
         raw_prompt = config.get("prompt", "")
 
         # Render system prompt
         system_prompt = tmpl.Template(raw_prompt, hass).async_render(
             state.to_template_context(), parse_result=False
         )
+        if system_prompt_prefix:
+            system_prompt = system_prompt_prefix + "\n\n" + system_prompt
         if state.language and state.language != "en":
             system_prompt += f"\n\nAlways respond in the user's language: {state.language}"
 
@@ -126,6 +131,11 @@ class RegularNode(BaseNode):
             "model": model,
             "messages": messages,
         }
+        for key in ("temperature", "top_p", "max_tokens"):
+            if key in model_params:
+                api_kwargs[key] = model_params[key]
+        if "reasoning_effort" in model_params:
+            api_kwargs["reasoning_effort"] = model_params["reasoning_effort"]
         if json_schema_format:
             # Structured output mode: disable tools to avoid conflicts
             api_kwargs["response_format"] = json_schema_format
@@ -135,7 +145,7 @@ class RegularNode(BaseNode):
 
         final_response = ""
 
-        for _ in range(MAX_TOOL_ITERATIONS):
+        for _ in range(max_tool_iterations):
             response = await client.chat.completions.create(**api_kwargs)
             choice = response.choices[0]
             message = choice.message

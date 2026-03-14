@@ -51,6 +51,16 @@ class GraphEngine:
         for node_config in graph.nodes:
             if "model" not in node_config:
                 node_config["model"] = graph.model or self.default_model
+            # Merge model_params: graph-level as base, node-level overrides
+            if graph.model_params:
+                merged = {**graph.model_params, **node_config.get("model_params", {})}
+                node_config["model_params"] = merged
+            # Propagate system_prompt_prefix (prepend to node prompts)
+            if graph.system_prompt_prefix and "system_prompt_prefix" not in node_config:
+                node_config["system_prompt_prefix"] = graph.system_prompt_prefix
+            # Propagate max_tool_iterations
+            if "max_tool_iterations" not in node_config:
+                node_config["max_tool_iterations"] = graph.max_tool_iterations
 
         # Pass event callback to state so nodes can emit tool events
         if self.event_callback:

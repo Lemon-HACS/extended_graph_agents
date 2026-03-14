@@ -2,9 +2,90 @@ import { useCallback, useRef, useState } from "react";
 import { useGraphStore } from "../../store/graphStore";
 import { useSkillStore } from "../../store/skillStore";
 import { useLang } from "../../contexts/LangContext";
-import type { GraphNode, FunctionTool, OutputSchemaField } from "../../types";
+import type { GraphNode, FunctionTool, OutputSchemaField, ModelParams } from "../../types";
 import { FunctionEditor, Field, inputStyle, addBtnStyle } from "../shared/FunctionEditor";
 import { renderTemplate, getStates, type HassConnection, type HassEntityState } from "../../utils/haApi";
+
+const MODEL_PRESETS = [
+  { label: "GPT-4.1", model: "gpt-4.1" },
+  { label: "GPT-5-nano", model: "gpt-5-nano" },
+  { label: "GPT-5-mini", model: "gpt-5-mini" },
+  { label: "GPT-5.4", model: "gpt-5.4" },
+];
+
+function ModelParamsEditor({
+  params,
+  onChange,
+}: {
+  params: ModelParams | undefined;
+  onChange: (p: ModelParams | undefined) => void;
+}) {
+  const t = useLang();
+  const p = params ?? {};
+
+  const toggle = (key: keyof ModelParams, defaultVal: unknown) => {
+    if (key in p) {
+      const next = { ...p };
+      delete (next as Record<string, unknown>)[key];
+      onChange(Object.keys(next).length ? next : undefined);
+    } else {
+      onChange({ ...p, [key]: defaultVal });
+    }
+  };
+
+  const setVal = (key: keyof ModelParams, val: unknown) => {
+    onChange({ ...p, [key]: val });
+  };
+
+  const checkboxStyle: React.CSSProperties = {
+    width: 14, height: 14, accentColor: "#7c3aed", cursor: "pointer",
+  };
+
+  const numInputStyle: React.CSSProperties = {
+    ...inputStyle,
+    width: 80,
+    display: "inline-block",
+    padding: "3px 8px",
+    fontSize: 12,
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input type="checkbox" checked={"temperature" in p} onChange={() => toggle("temperature", 1.0)} style={checkboxStyle} />
+        <span style={{ color: "#94a3b8", fontSize: 12, width: 120 }}>{t.paramTemperature}</span>
+        {"temperature" in p && (
+          <input type="number" min={0} max={2} step={0.1} value={p.temperature ?? 1.0} onChange={(e) => setVal("temperature", parseFloat(e.target.value))} style={numInputStyle} />
+        )}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input type="checkbox" checked={"top_p" in p} onChange={() => toggle("top_p", 1.0)} style={checkboxStyle} />
+        <span style={{ color: "#94a3b8", fontSize: 12, width: 120 }}>{t.paramTopP}</span>
+        {"top_p" in p && (
+          <input type="number" min={0} max={1} step={0.05} value={p.top_p ?? 1.0} onChange={(e) => setVal("top_p", parseFloat(e.target.value))} style={numInputStyle} />
+        )}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input type="checkbox" checked={"max_tokens" in p} onChange={() => toggle("max_tokens", 2048)} style={checkboxStyle} />
+        <span style={{ color: "#94a3b8", fontSize: 12, width: 120 }}>{t.paramMaxTokens}</span>
+        {"max_tokens" in p && (
+          <input type="number" min={1} max={100000} step={256} value={p.max_tokens ?? 2048} onChange={(e) => setVal("max_tokens", parseInt(e.target.value))} style={numInputStyle} />
+        )}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input type="checkbox" checked={"reasoning_effort" in p} onChange={() => toggle("reasoning_effort", "medium")} style={checkboxStyle} />
+        <span style={{ color: "#94a3b8", fontSize: 12, width: 120 }}>{t.paramReasoningEffort}</span>
+        {"reasoning_effort" in p && (
+          <select value={p.reasoning_effort ?? "medium"} onChange={(e) => setVal("reasoning_effort", e.target.value)} style={{ ...inputStyle, padding: "3px 8px", fontSize: 12, width: "auto" }}>
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface NodeConfigPanelProps {
   conn: HassConnection;
@@ -246,6 +327,26 @@ export function NodeConfigPanel({ conn, onClose, isMobile, panelWidth = 380 }: N
             </Field>
 
             <Field label={t.modelOptional}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+                {MODEL_PRESETS.map((preset) => (
+                  <button
+                    key={preset.model}
+                    onClick={() => update("model", preset.model)}
+                    style={{
+                      background: data.model === preset.model ? "#2d1b69" : "#1e293b",
+                      border: `1px solid ${data.model === preset.model ? "#6d28d9" : "#334155"}`,
+                      color: data.model === preset.model ? "#c4b5fd" : "#94a3b8",
+                      borderRadius: 5,
+                      padding: "3px 8px",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
               <input
                 value={data.model ?? ""}
                 onChange={(e) => update("model", e.target.value || undefined)}
@@ -253,6 +354,16 @@ export function NodeConfigPanel({ conn, onClose, isMobile, panelWidth = 380 }: N
                 style={inputStyle}
               />
             </Field>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: "#94a3b8", fontSize: 11, fontWeight: 600, marginBottom: 8 }}>
+                {t.modelParams} <span style={{ color: "#475569", fontWeight: 400 }}>(노드 오버라이드)</span>
+              </div>
+              <ModelParamsEditor
+                params={data.model_params}
+                onChange={(p) => update("model_params", p)}
+              />
+            </div>
 
             <PromptField
               value={data.prompt ?? ""}

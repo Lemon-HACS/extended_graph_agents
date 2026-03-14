@@ -26,6 +26,7 @@ class RouterNode(BaseNode):
     ) -> NodeResult:
         config = self.config
         model = config.get("model", "gpt-4o")
+        model_params: dict[str, Any] = config.get("model_params") or {}
         output_key = config.get("output_key", "route")
 
         # Render prompt
@@ -59,10 +60,10 @@ class RouterNode(BaseNode):
             }
 
         try:
-            response = await client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                response_format={
+            router_kwargs: dict[str, Any] = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "response_format": {
                     "type": "json_schema",
                     "json_schema": {
                         "name": "routing_decision",
@@ -70,11 +71,30 @@ class RouterNode(BaseNode):
                         "schema": schema,
                     },
                 },
-                max_completion_tokens=200,
-            )
-            raw_output = response.choices[0].message.content or "{}"
-            output_data = json.loads(raw_output)
+                "max_completion_tokens": model_params.get("max_tokens", 200),
+            }
+            for key in ("temperature", "top_p"):
+                if key in model_params:
+                    router_kwargs[key] = model_params[key]
+            if "reasoning_effort" in model_params:
+                router_kwargs["reasoning_effort"] = model_params["reasoning_effort"]
+            response = await client.chat.completions.create(**router_kwargs)
+            content = response.choices[0].message.content
+            if not content:
+                raise RouterError(
+                    f"Router got empty response from model '{model}'. "
+                    "The model may not support json_schema structured output."
+                )
+            output_data = json.loads(content)
             route_value = output_data.get(output_key, "")
+            if values and route_value not in values:
+                raise RouterError(
+                    f"Router returned invalid value '{route_value}' "
+                    f"(expected one of {values}). Raw response: {content}"
+                )
+        except (RouterError, json.JSONDecodeError) as err:
+            _LOGGER.error("Router failed: %s", err)
+            raise RouterError(str(err)) from err
         except Exception as err:
             _LOGGER.error("Router LLM call failed: %s", err)
             raise RouterError(f"Router failed: {err}") from err

@@ -28,6 +28,9 @@ class GraphDefinition:
         self.name: str = data.get("name", self.id)
         self.description: str = data.get("description", "")
         self.model: str = data.get("model", "gpt-4o")
+        self.model_params: dict[str, Any] = data.get("model_params") or {}
+        self.system_prompt_prefix: str = data.get("system_prompt_prefix", "")
+        self.max_tool_iterations: int = data.get("max_tool_iterations", 10)
         self.nodes: list[dict[str, Any]] = data.get("nodes", [])
         self.edges: list[EdgeDefinition] = [
             EdgeDefinition(
