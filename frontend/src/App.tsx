@@ -308,7 +308,7 @@ export function App({ hass }: AppProps) {
                       borderColor: showGraphSettings ? "#3b82f6" : "#334155",
                     }}
                   >
-                    ⚙️
+                    ⚙ 설정
                   </button>
 
                   <button
@@ -319,7 +319,7 @@ export function App({ hass }: AppProps) {
                       borderColor: debugMode ? "#d97706" : "#334155",
                     }}
                   >
-                    🐛
+                    🐛 디버그
                   </button>
 
                   <button
@@ -330,7 +330,7 @@ export function App({ hass }: AppProps) {
                       borderColor: showAiAssist ? "#6d28d9" : "#334155",
                     }}
                   >
-                    ✨
+                    ✨ AI 생성
                   </button>
 
                   <button

@@ -5,7 +5,6 @@ import { useGraphStore } from "../../store/graphStore";
 
 export function RegularNode({ data, selected, id }: NodeProps) {
   const node = data as unknown as GraphNode;
-  const funcCount = node.functions?.length ?? 0;
   const skillCount = node.skills?.length ?? 0;
   const highlighted = useGraphStore((s) => s.highlightedNodeIds.has(id));
 
@@ -50,19 +49,6 @@ export function RegularNode({ data, selected, id }: NodeProps) {
       )}
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {funcCount > 0 && (
-          <span
-            style={{
-              fontSize: 10,
-              background: "rgba(34,197,94,0.2)",
-              borderRadius: 4,
-              padding: "1px 6px",
-              border: "1px solid rgba(34,197,94,0.4)",
-            }}
-          >
-            {funcCount} fn
-          </span>
-        )}
         {skillCount > 0 && (
           <span
             style={{

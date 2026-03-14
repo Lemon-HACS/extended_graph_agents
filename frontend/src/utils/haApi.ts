@@ -132,6 +132,22 @@ export async function aiAssist(
   }) as AiAssistResult;
 }
 
+export async function runSkillTest(
+  conn: HassConnection,
+  skillId: string,
+  userInput: string,
+  model?: string,
+  language?: string
+): Promise<import("../types").DebugRunResult> {
+  return await conn.sendMessagePromise({
+    type: `${DOMAIN}/run_skill_test`,
+    skill_id: skillId,
+    user_input: userInput,
+    ...(model ? { model } : {}),
+    ...(language ? { language } : {}),
+  }) as import("../types").DebugRunResult;
+}
+
 export async function getStates(conn: HassConnection): Promise<HassEntityState[]> {
   const result = (await conn.sendMessagePromise({
     type: "get_states",

@@ -20,7 +20,6 @@ interface KVEntry {
 
 const PARAM_TYPES = ["string", "integer", "number", "boolean", "array", "object"] as const;
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
-const FILE_OPS = ["read", "write", "append"];
 
 // ── Converters ─────────────────────────────────────────────────────────────────
 
@@ -65,11 +64,7 @@ function getFunctionTypeOptions(t: Translations) {
   return [
     { value: "native", label: t.funcTypeNative },
     { value: "template", label: t.funcTypeTemplate },
-    { value: "script", label: t.funcTypeScript },
     { value: "web", label: t.funcTypeWeb },
-    { value: "bash", label: t.funcTypeBash },
-    { value: "file", label: t.funcTypeFile },
-    { value: "sqlite", label: t.funcTypeSqlite },
   ];
 }
 
@@ -274,14 +269,6 @@ function TypeConfig({
       return <TemplateConfig config={config} onChange={onChange} />;
     case "web":
       return <WebConfig config={config} onChange={onChange} />;
-    case "bash":
-      return <BashConfig config={config} onChange={onChange} />;
-    case "file":
-      return <FileConfig config={config} onChange={onChange} />;
-    case "sqlite":
-      return <SqliteConfig config={config} onChange={onChange} />;
-    case "script":
-      return <ScriptConfig config={config} onChange={onChange} />;
     default:
       return null;
   }
@@ -402,103 +389,6 @@ function WebConfig({ config, onChange }: { config: FunctionConfig; onChange: (p:
           {t.addHeader}
         </button>
       </div>
-    </>
-  );
-}
-
-// ── BashConfig ─────────────────────────────────────────────────────────────────
-
-function BashConfig({ config, onChange }: { config: FunctionConfig; onChange: (p: Partial<FunctionConfig>) => void }) {
-  const t = useLang();
-  return (
-    <>
-      <UsageHint text={t.bashUsage} />
-      <Field label={t.bashCommand}>
-        <textarea
-          value={(config.command as string) ?? ""}
-          onChange={(e) => onChange({ command: e.target.value })}
-          rows={3}
-          placeholder={"df -h /data\n# 또는\ncat /config/notes/{{ filename }}"}
-          style={{ ...inputStyle, fontFamily: "monospace", fontSize: 11, resize: "vertical" }}
-        />
-      </Field>
-    </>
-  );
-}
-
-// ── FileConfig ─────────────────────────────────────────────────────────────────
-
-function FileConfig({ config, onChange }: { config: FunctionConfig; onChange: (p: Partial<FunctionConfig>) => void }) {
-  const t = useLang();
-  return (
-    <>
-      <UsageHint text={t.fileUsage} />
-      <Field label={t.fileOperation}>
-        <select value={(config.operation as string) ?? "read"} onChange={(e) => onChange({ operation: e.target.value })} style={inputStyle}>
-          {FILE_OPS.map((op) => <option key={op} value={op}>{op}</option>)}
-        </select>
-      </Field>
-      <Field label={t.filePath}>
-        <input
-          value={(config.path as string) ?? ""}
-          onChange={(e) => onChange({ path: e.target.value })}
-          placeholder="/config/notes/{{ filename }}.txt"
-          style={inputStyle}
-        />
-      </Field>
-    </>
-  );
-}
-
-// ── SqliteConfig ───────────────────────────────────────────────────────────────
-
-function SqliteConfig({ config, onChange }: { config: FunctionConfig; onChange: (p: Partial<FunctionConfig>) => void }) {
-  const t = useLang();
-  return (
-    <>
-      <UsageHint text={t.sqliteUsage} />
-      <Field label={t.sqliteDbPath}>
-        <input
-          value={(config.db_path as string) ?? ""}
-          onChange={(e) => onChange({ db_path: e.target.value })}
-          placeholder="/config/home-assistant_v2.db"
-          style={inputStyle}
-        />
-      </Field>
-      <label style={{ display: "flex", alignItems: "center", gap: 8, color: "#94a3b8", fontSize: 12, cursor: "pointer" }}>
-        <input
-          type="checkbox"
-          checked={(config.allow_write as boolean) ?? false}
-          onChange={(e) => onChange({ allow_write: e.target.checked })}
-        />
-        {t.allowWrite}
-      </label>
-    </>
-  );
-}
-
-// ── ScriptConfig ───────────────────────────────────────────────────────────────
-
-function ScriptConfig({ config, onChange }: { config: FunctionConfig; onChange: (p: Partial<FunctionConfig>) => void }) {
-  const t = useLang();
-  return (
-    <>
-      <UsageHint text={t.scriptUsage} />
-      <Field label={t.sequenceJson}>
-        <textarea
-          value={JSON.stringify(config.sequence ?? [], null, 2)}
-          onChange={(e) => {
-            try {
-              onChange({ sequence: JSON.parse(e.target.value) });
-            } catch {
-              // ignore parse errors while typing
-            }
-          }}
-          rows={6}
-          placeholder={'[\n  {"service": "light.turn_on", "target": {"entity_id": "light.living_room"}},\n  {"delay": {"seconds": 1}}\n]'}
-          style={{ ...inputStyle, fontFamily: "monospace", fontSize: 11, resize: "vertical" }}
-        />
-      </Field>
     </>
   );
 }

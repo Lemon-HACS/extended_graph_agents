@@ -51,7 +51,6 @@ export interface GraphNode {
   output_key?: string;
   values?: string[];      // enum options for LLM structured output
   // Regular specific
-  functions?: FunctionTool[];
   skills?: string[];
   output_schema?: OutputSchemaField[];  // JSON structured output mode
   // Output node specific

@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import * as jsYaml from "js-yaml";
 import { useGraphStore } from "../../store/graphStore";
-import { useSkillStore } from "../../store/skillStore";
 import { aiAssist } from "../../utils/haApi";
 import type { AiAssistScope, AiAssistMessage } from "../../utils/haApi";
 import type { HassConnection } from "../../utils/haApi";
 import type { GraphNode } from "../../types";
 import { graphToYaml, yamlToGraph } from "../../utils/serializer";
+
+const STORAGE_KEY = "ega_ai_graph_chat";
 
 interface ChatMessage {
   id: string;
@@ -33,18 +34,30 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
     getCurrentGraphDef,
   } = useGraphStore();
 
-  const { editingSkill, setPendingAiSkillYaml } = useSkillStore();
-
   const [scope, setScope] = useState<AiAssistScope>(
     selectedNodeId ? "node" : "graph"
   );
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Persist messages to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    } catch {}
+  }, [messages]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -59,11 +72,8 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
       const node = flowNodes.find((n) => n.id === selectedNodeId);
       return node ? jsYaml.dump(node.data, { lineWidth: 120 }) : "";
     }
-    if (sc === "skill" && editingSkill) {
-      return jsYaml.dump(editingSkill, { lineWidth: 120 });
-    }
     return "";
-  }, [getCurrentGraphDef, selectedNodeId, flowNodes, editingSkill]);
+  }, [getCurrentGraphDef, selectedNodeId, flowNodes]);
 
   const getContext = useCallback((sc: AiAssistScope): Record<string, string> => {
     if (sc === "graph" && currentGraph) {
@@ -78,11 +88,8 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
         node_name: data?.name ?? "",
       };
     }
-    if (sc === "skill" && editingSkill) {
-      return { skill_id: editingSkill.id, skill_name: editingSkill.name };
-    }
     return {};
-  }, [currentGraph, selectedNodeId, flowNodes, editingSkill]);
+  }, [currentGraph, selectedNodeId, flowNodes]);
 
   const handleSend = async () => {
     const trimmed = input.trim();
@@ -133,8 +140,6 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id: _id, type: _type, ...rest } = data;
         updateNodeData(selectedNodeId, rest);
-      } else if (sc === "skill") {
-        setPendingAiSkillYaml(yaml);
       }
       setError(null);
     } catch (err) {
@@ -143,10 +148,6 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
   };
 
   const handleTest = (yaml: string, sc: AiAssistScope) => {
-    if (sc === "skill") {
-      setError("스킬은 그래프 노드에 연결 후 디버그 패널에서 테스트하세요.");
-      return;
-    }
     handleApply(yaml, sc);
     onOpenDebug();
   };
@@ -155,10 +156,14 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
     navigator.clipboard.writeText(yaml).catch(() => {});
   };
 
+  const handleClear = () => {
+    setMessages([]);
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  };
+
   // 스코프 유효성 체크
   const scopeWarning = (() => {
     if (scope === "node" && !selectedNodeId) return "캔버스에서 노드를 클릭해서 선택하세요.";
-    if (scope === "skill" && !editingSkill) return "Skills 탭에서 스킬을 먼저 선택하세요.";
     return null;
   })();
 
@@ -169,7 +174,6 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
       const data = node?.data as GraphNode | undefined;
       return `노드: ${data?.name ?? selectedNodeId}`;
     }
-    if (scope === "skill" && editingSkill) return `스킬: ${editingSkill.name}`;
     return null;
   })();
 
@@ -201,13 +205,13 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
       {/* Header */}
       <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e293b", flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div style={{ color: "#a78bfa", fontSize: 11, marginBottom: 2, fontWeight: 700 }}>✨ AI ASSIST</div>
+          <div style={{ color: "#a78bfa", fontSize: 11, marginBottom: 2, fontWeight: 700 }}>✨ AI 생성</div>
           <div style={{ color: "white", fontWeight: 600, fontSize: 14 }}>AI 어시스턴트</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {messages.length > 0 && (
             <button
-              onClick={() => setMessages([])}
+              onClick={handleClear}
               style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 11, padding: "2px 6px" }}
               title="대화 기록 지우기"
             >
@@ -221,7 +225,7 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
       {/* Scope selector */}
       <div style={{ padding: "8px 16px", borderBottom: "1px solid #1e293b", flexShrink: 0 }}>
         <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
-          {(["graph", "node", "skill"] as AiAssistScope[]).map((sc) => (
+          {(["graph", "node"] as AiAssistScope[]).map((sc) => (
             <button
               key={sc}
               onClick={() => { setScope(sc); setError(null); }}
@@ -237,7 +241,7 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
                 fontWeight: 600,
               }}
             >
-              {sc === "graph" ? "Graph" : sc === "node" ? "Node" : "Skill"}
+              {sc === "graph" ? "Graph" : "Node"}
             </button>
           ))}
         </div>
@@ -387,12 +391,10 @@ function ChatBubble({ msg, currentScope, onApply, onTest, onCopy }: ChatBubblePr
         padding: "10px 14px",
         maxWidth: "95%",
       }}>
-        {/* Explanation */}
         <div style={{ color: "#86efac", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
           {msg.content}
         </div>
 
-        {/* YAML 토글 */}
         {msg.yaml && (
           <div style={{ marginTop: 10 }}>
             <button
@@ -433,7 +435,6 @@ function ChatBubble({ msg, currentScope, onApply, onTest, onCopy }: ChatBubblePr
         )}
       </div>
 
-      {/* 액션 버튼들 */}
       {msg.yaml && (
         <div style={{ display: "flex", gap: 6, paddingLeft: 4 }}>
           <button
@@ -484,8 +485,6 @@ function ChatBubble({ msg, currentScope, onApply, onTest, onCopy }: ChatBubblePr
     </div>
   );
 }
-
-// ── 로딩 애니메이션 ───────────────────────────────────────────────────────────
 
 function LoadingDots() {
   return (

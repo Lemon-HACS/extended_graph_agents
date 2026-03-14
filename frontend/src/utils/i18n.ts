@@ -123,20 +123,13 @@ const en = {
   enumValuesPlaceholder: 'enum values (comma separated, e.g. "on, off")',
   addDataField: "+ Add Data Field",
   addHeader: "+ Add Header",
-  allowWrite: "Allow Write (INSERT / UPDATE / DELETE)",
-  sequenceJson: "Sequence (JSON)",
-  bashCommand: "Command",
   valueTemplate: "value_template",
   functionConfigSection: "Function Config",
 
   // FunctionEditor - function type display names
   funcTypeNative: "HA Service (native)",
   funcTypeTemplate: "Jinja2 Template (template)",
-  funcTypeScript: "HA Script (script)",
   funcTypeWeb: "HTTP Request (web)",
-  funcTypeBash: "Shell Command (bash)",
-  funcTypeFile: "File (file)",
-  funcTypeSqlite: "SQLite (sqlite)",
 
   // FunctionEditor - field labels
   nativeService: "Service",
@@ -144,18 +137,11 @@ const en = {
   webUrl: "URL",
   webMethod: "Method",
   webHeaders: "Headers",
-  fileOperation: "Operation",
-  filePath: "Path",
-  sqliteDbPath: "DB Path",
 
   // FunctionEditor - type usage descriptions
   nativeUsage: "Calls a Home Assistant service. Use for controlling lights, switches, media players, etc.",
   templateUsage: "Returns a Jinja2-rendered value. Use for reading sensor states, computing values, or formatting strings.",
   webUsage: "Makes an HTTP request to an external API. Use for fetching weather data, calling REST APIs, webhooks, etc.",
-  bashUsage: "Runs a shell command on the HA host. Use for file management, system info, or custom scripts.",
-  fileUsage: "Reads or writes a file on the HA host. Use for persistent notes, logs, or configuration data.",
-  sqliteUsage: "Executes an SQL query on a SQLite database. Use for reading HA history or custom data tables.",
-  scriptUsage: "Runs a Home Assistant script sequence (YAML action list). Use for multi-step automations.",
 };
 
 const ko: typeof en = {
@@ -283,20 +269,13 @@ const ko: typeof en = {
   enumValuesPlaceholder: '열거값 (쉼표 구분, 예: "on, off")',
   addDataField: "+ 데이터 필드 추가",
   addHeader: "+ 헤더 추가",
-  allowWrite: "쓰기 허용 (INSERT / UPDATE / DELETE)",
-  sequenceJson: "시퀀스 (JSON)",
-  bashCommand: "명령어",
   valueTemplate: "value_template",
   functionConfigSection: "함수 설정",
 
   // FunctionEditor - function type display names
   funcTypeNative: "HA 서비스 (native)",
   funcTypeTemplate: "Jinja2 템플릿 (template)",
-  funcTypeScript: "HA 스크립트 (script)",
   funcTypeWeb: "HTTP 요청 (web)",
-  funcTypeBash: "쉘 명령어 (bash)",
-  funcTypeFile: "파일 (file)",
-  funcTypeSqlite: "SQLite (sqlite)",
 
   // FunctionEditor - field labels
   nativeService: "서비스",
@@ -304,18 +283,11 @@ const ko: typeof en = {
   webUrl: "URL",
   webMethod: "메서드",
   webHeaders: "헤더",
-  fileOperation: "동작",
-  filePath: "경로",
-  sqliteDbPath: "DB 경로",
 
   // FunctionEditor - type usage descriptions
   nativeUsage: "HA 서비스를 호출합니다. 조명 제어, 스위치 토글, 미디어 플레이어 등에 사용하세요.",
   templateUsage: "Jinja2 템플릿으로 값을 반환합니다. 센서 상태 읽기, 값 계산, 문자열 포매팅 등에 사용하세요.",
   webUsage: "외부 API에 HTTP 요청을 보냅니다. 날씨 API, REST 서비스 호출, 웹훅 등에 사용하세요.",
-  bashUsage: "HA 호스트에서 쉘 명령어를 실행합니다. 파일 관리, 시스템 정보 조회, 커스텀 스크립트 등에 사용하세요.",
-  fileUsage: "HA 호스트의 파일을 읽거나 씁니다. 메모 저장, 로그 기록, 설정 파일 관리 등에 사용하세요.",
-  sqliteUsage: "SQLite DB에 SQL 쿼리를 실행합니다. HA 히스토리 조회나 커스텀 데이터 테이블 접근 등에 사용하세요.",
-  scriptUsage: "HA 스크립트 시퀀스(YAML 액션 목록)를 실행합니다. 여러 단계의 자동화에 사용하세요.",
 };
 
 export type Translations = typeof en;

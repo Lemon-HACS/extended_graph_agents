@@ -23,6 +23,4 @@ def get_function(func_type: str) -> Function:
 
 
 # Import all function modules to register them
-from . import native, template, script, web, bash  # noqa: F401, E402
-from . import file as file_func  # noqa: F401, E402
-from . import sqlite  # noqa: F401, E402
+from . import native, template, web  # noqa: F401, E402

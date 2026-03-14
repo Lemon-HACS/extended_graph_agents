@@ -27,6 +27,7 @@ def async_setup_websocket_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_render_template)
     websocket_api.async_register_command(hass, ws_run_graph)
     websocket_api.async_register_command(hass, ws_ai_assist)
+    websocket_api.async_register_command(hass, ws_run_skill_test)
 
 
 def _get_skill_loader(hass: HomeAssistant) -> SkillLoader:
@@ -326,6 +327,113 @@ async def ws_ai_assist(
         connection.send_error(msg["id"], "ai_error", str(err))
 
 
+@websocket_api.require_admin
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/run_skill_test",
+    vol.Required("skill_id"): str,
+    vol.Required("user_input"): str,
+    vol.Optional("model"): str,
+    vol.Optional("language", default="en"): str,
+})
+@websocket_api.async_response
+async def ws_run_skill_test(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Run a skill in a temporary single-agent graph for testing."""
+    import uuid
+    from .graph_engine import GraphEngine, ExecutionEvent
+    from .graph_state import GraphState
+    from .graph_loader import GraphDefinition
+    from .helpers import get_exposed_entities
+    from .exceptions import GraphExecutionError
+    from .const import DEFAULT_CHAT_MODEL
+
+    entries = hass.config_entries.async_entries(DOMAIN)
+    if not entries:
+        connection.send_error(msg["id"], "no_config", "No Extended Graph Agents config entry found")
+        return
+    client = entries[0].runtime_data
+
+    skill_id = msg["skill_id"]
+    user_input = msg["user_input"]
+    model = msg.get("model") or DEFAULT_CHAT_MODEL
+    language = msg.get("language", "en")
+
+    skill_loader = _get_skill_loader(hass)
+    try:
+        skill = skill_loader.load_by_id(skill_id)
+    except Exception as err:
+        connection.send_error(msg["id"], "skill_not_found", str(err))
+        return
+
+    temp_graph_data = {
+        "id": f"__skill_test_{skill_id}",
+        "name": f"Skill Test: {skill.name}",
+        "model": model,
+        "nodes": [
+            {"id": "input", "type": "input", "name": "Input"},
+            {
+                "id": "agent",
+                "type": "regular",
+                "name": skill.name,
+                "prompt": "You are a helpful assistant. Use the available tools to help the user.\n\nUser request: {{ user_input }}",
+                "skills": [skill_id],
+            },
+            {"id": "output", "type": "output", "name": "Output"},
+        ],
+        "edges": [
+            {"source": "input", "target": "agent"},
+            {"source": "agent", "target": "output"},
+        ],
+    }
+
+    try:
+        graph = GraphDefinition(temp_graph_data)
+    except InvalidGraph as err:
+        connection.send_error(msg["id"], "invalid_graph", str(err))
+        return
+
+    trace: list[dict] = []
+
+    def on_event(event: ExecutionEvent) -> None:
+        trace.append({"type": event.event_type, **event.data})
+
+    state = GraphState(
+        user_input=user_input,
+        conversation_id=str(uuid.uuid4()),
+        language=language,
+    )
+
+    exposed_entities = get_exposed_entities(hass)
+
+    try:
+        engine = GraphEngine(
+            hass=hass,
+            client=client,
+            default_model=model,
+            event_callback=on_event,
+        )
+        output = await engine.execute(graph, state, exposed_entities)
+    except GraphExecutionError as err:
+        connection.send_result(msg["id"], {
+            "trace": trace,
+            "output": None,
+            "error": str(err),
+        })
+        return
+    except Exception as err:
+        connection.send_error(msg["id"], "execution_failed", str(err))
+        return
+
+    connection.send_result(msg["id"], {
+        "trace": trace,
+        "output": output,
+        "error": None,
+    })
+
+
 def _build_ai_assist_prompt(scope: str, context: dict[str, Any]) -> str:
     """스코프별 시스템 프롬프트를 생성한다."""
 
@@ -388,26 +496,7 @@ values:               # LLM이 선택 가능한 값 목록
 ```yaml
 prompt: |             # Jinja2. {{ user_input }}, {{ node_outputs['id'] }}, {{ variables['id.key'] }}
 model: string         # 선택사항. 이 노드만 다른 모델 사용
-functions:            # 선택사항
-  - spec:
-      name: function_name
-      description: 설명
-      parameters:
-        type: object
-        properties:
-          param1:
-            type: string
-            description: 파라미터 설명
-        required: [param1]
-    function:
-      type: native|template|web|bash|file|sqlite|script
-      # native:   service: "domain.service_name", data: {{param1: "{{{{ param1 }}}}"}}
-      # template: value_template: "{{{{ states('sensor.x') }}}}"
-      # web:      url: "https://...", method: GET|POST, headers: {{}}
-      # bash:     command: "echo hello"
-      # file:     operation: read|write|append, path: "/config/..."
-      # sqlite:   db_path: "/config/home-assistant_v2.db", allow_write: false
-skills:               # 선택사항. 재사용 가능한 함수 집합 ID 목록
+skills:               # 재사용 가능한 스킬 ID 목록 (functions 대신 skills를 사용하세요)
   - skill_id
 output_schema:        # 선택사항. JSON 구조화 출력
   - key: field_name
@@ -434,29 +523,11 @@ output_schema:        # 선택사항. JSON 구조화 출력
 # 노드 타입별 필드
 
 **router**: output_key(변수명), values(선택지 목록), prompt(Jinja2)
-**regular**: prompt(Jinja2), functions(목록), skills(ID 목록), output_schema(구조화 출력), model(선택사항)
+**regular**: prompt(Jinja2), skills(ID 목록), output_schema(구조화 출력), model(선택사항)
 **output**: output_template(Jinja2, 선택사항)
 **input**: 추가 필드 없음
 
-# functions 예시
-```yaml
-functions:
-  - spec:
-      name: turn_on_light
-      description: 조명을 켠다
-      parameters:
-        type: object
-        properties:
-          entity_id:
-            type: string
-            description: 조명 entity_id (예: light.living_room)
-        required: [entity_id]
-    function:
-      type: native
-      service: light.turn_on
-      data:
-        entity_id: "{{{{ entity_id }}}}"
-```
+스킬은 Skills 탭에서 관리하며, 노드에는 skill ID 목록만 지정합니다.
 
 노드 YAML만 반환하세요."""
 
@@ -485,14 +556,10 @@ functions:
             enum: [선택1, 선택2]   # 선택사항
         required: [필수파라미터명]
     function:
-      type: native|template|web|bash|file|sqlite|script
+      type: native|template|web
       # native   → service: "domain.service", data: {{param: "{{{{ param }}}}"}}
       # template → value_template: "{{{{ states('sensor.x') }}}}"
-      # web      → url: "...", method: GET, headers: {{}}
-      # bash     → command: "echo {{{{ param }}}}"
-      # file     → operation: read|write|append, path: "/config/..."
-      # sqlite   → db_path: "/config/home-assistant_v2.db", allow_write: false
-      # script   → sequence: [{{service: ..., data: ...}}]
+      # web      → url: "...", method: GET|POST, headers: {{}}
 ```
 
 현재 스킬: id={skill_id}, name={skill_name}

@@ -2,8 +2,8 @@ import { useCallback, useRef, useState } from "react";
 import { useGraphStore } from "../../store/graphStore";
 import { useSkillStore } from "../../store/skillStore";
 import { useLang } from "../../contexts/LangContext";
-import type { GraphNode, FunctionTool, OutputSchemaField, ModelParams } from "../../types";
-import { FunctionEditor, Field, inputStyle, addBtnStyle } from "../shared/FunctionEditor";
+import type { GraphNode, OutputSchemaField, ModelParams } from "../../types";
+import { Field, inputStyle, addBtnStyle } from "../shared/FunctionEditor";
 import { renderTemplate, getStates, type HassConnection, type HassEntityState } from "../../utils/haApi";
 
 const MODEL_PRESETS = [
@@ -578,7 +578,6 @@ function RegularConfig({
   update: (f: string, v: unknown) => void;
 }) {
   const t = useLang();
-  const functions = data.functions ?? [];
   const skills = data.skills ?? [];
   const outputSchema = data.output_schema ?? [];
   const jsonModeEnabled = outputSchema.length > 0;
@@ -589,40 +588,6 @@ function RegularConfig({
     } else {
       update("output_schema", [{ key: "result", type: "string", description: "", enum: [] }]);
     }
-  };
-
-  const addFunction = () => {
-    const newFunc: FunctionTool = {
-      spec: {
-        name: `function_${functions.length + 1}`,
-        description: "",
-        parameters: {
-          type: "object",
-          properties: {},
-          required: [],
-        },
-      },
-      function: {
-        type: "native",
-        service: "",
-        data: {},
-      },
-    };
-    update("functions", [...functions, newFunc]);
-  };
-
-  const updateFunction = (i: number, funcData: Partial<FunctionTool>) => {
-    update(
-      "functions",
-      functions.map((f, idx) => (idx === i ? { ...f, ...funcData } : f))
-    );
-  };
-
-  const removeFunction = (i: number) => {
-    update(
-      "functions",
-      functions.filter((_, idx) => idx !== i)
-    );
   };
 
   return (
@@ -671,27 +636,6 @@ function RegularConfig({
           />
         )}
       </div>
-
-      {/* Functions (hidden in JSON mode) */}
-      {!jsonModeEnabled && (
-        <div style={{ marginTop: 16 }}>
-          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8, fontWeight: 600 }}>
-            {t.functions}
-          </div>
-          {functions.map((func, i) => (
-            <FunctionEditor
-              key={i}
-              index={i}
-              func={func}
-              onChange={(f) => updateFunction(i, f)}
-              onRemove={() => removeFunction(i)}
-            />
-          ))}
-          <button onClick={addFunction} style={addBtnStyle}>
-            {t.addFunction}
-          </button>
-        </div>
-      )}
 
       <div style={{ marginTop: 16 }}>
         <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8, fontWeight: 600 }}>
