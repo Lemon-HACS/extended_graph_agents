@@ -24,6 +24,9 @@ export function SkillWorkspace({ conn, isMobile, onOpenSidebar }: SkillWorkspace
   const [saving, setSaving] = useState(false);
   const [rightPanel, setRightPanel] = useState<"none" | "ai" | "test">("none");
 
+  // dirty 감지: draft vs 마지막 저장 상태(editingSkill) 비교
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(editingSkill);
+
   // Sync draft when selected skill changes
   useEffect(() => {
     setDraft(editingSkill);
@@ -158,10 +161,23 @@ export function SkillWorkspace({ conn, isMobile, onOpenSidebar }: SkillWorkspace
     );
   }
 
-  const panelWidth = isMobile ? 0 : 360;
+  const panelWidth = 360;
 
   return (
-    <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0 }}>
+    <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0, position: "relative" }}>
+      {/* Mobile backdrop */}
+      {isMobile && rightPanel !== "none" && (
+        <div
+          onClick={() => setRightPanel("none")}
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 40,
+          }}
+        />
+      )}
+
       {/* Main editor area */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
         {/* Header */}
@@ -284,9 +300,9 @@ export function SkillWorkspace({ conn, isMobile, onOpenSidebar }: SkillWorkspace
               onClick={handleSave}
               disabled={saving}
               style={{
-                background: saving ? "#1e1a3a" : "#2d1b69",
-                border: "1px solid #6d28d9",
-                color: "#c4b5fd",
+                background: saving ? "#1e1a3a" : isDirty ? "#2d1b69" : "#1a1a2e",
+                border: `1px solid ${isDirty ? "#6d28d9" : "#334155"}`,
+                color: isDirty ? "#c4b5fd" : "#475569",
                 borderRadius: 6,
                 padding: "5px 16px",
                 cursor: saving ? "not-allowed" : "pointer",
@@ -295,7 +311,7 @@ export function SkillWorkspace({ conn, isMobile, onOpenSidebar }: SkillWorkspace
                 opacity: saving ? 0.7 : 1,
               }}
             >
-              {saving ? "저장 중..." : t.saveSkill}
+              {saving ? "저장 중..." : isDirty ? `${t.saveSkill} *` : t.saveSkill}
             </button>
           </div>
         </div>
@@ -404,12 +420,13 @@ export function SkillWorkspace({ conn, isMobile, onOpenSidebar }: SkillWorkspace
         </div>
       </div>
 
-      {/* Right panel: AI or Test */}
-      {rightPanel === "ai" && !isMobile && (
+      {/* Right panel: AI or Test (desktop: side panel, mobile: bottom sheet) */}
+      {rightPanel === "ai" && (
         <SkillAiPanel
           conn={conn}
           skill={draft}
           panelWidth={panelWidth}
+          isMobile={isMobile}
           onApply={(yamlStr) => {
             setYamlText(yamlStr);
             setTab("yaml");
@@ -417,11 +434,14 @@ export function SkillWorkspace({ conn, isMobile, onOpenSidebar }: SkillWorkspace
           onClose={() => setRightPanel("none")}
         />
       )}
-      {rightPanel === "test" && !isMobile && (
+      {rightPanel === "test" && (
         <SkillTestPanel
           conn={conn}
           skill={draft}
           panelWidth={panelWidth}
+          isMobile={isMobile}
+          isDirty={isDirty}
+          onSave={handleSave}
           onClose={() => setRightPanel("none")}
         />
       )}
@@ -435,6 +455,7 @@ interface SkillAiPanelProps {
   conn: HassConnection;
   skill: SkillDefinition;
   panelWidth: number;
+  isMobile?: boolean;
   onApply: (yaml: string) => void;
   onClose: () => void;
 }
@@ -446,7 +467,7 @@ interface ChatMessage {
   yaml?: string;
 }
 
-function SkillAiPanel({ conn, skill, panelWidth, onApply, onClose }: SkillAiPanelProps) {
+function SkillAiPanel({ conn, skill, panelWidth, isMobile, onApply, onClose }: SkillAiPanelProps) {
   const storageKey = `ega_skill_ai_chat_${skill.id}`;
 
   const [input, setInput] = useState("");
@@ -513,15 +534,31 @@ function SkillAiPanel({ conn, skill, panelWidth, onApply, onClose }: SkillAiPane
     try { localStorage.removeItem(storageKey); } catch {}
   };
 
-  const containerStyle: React.CSSProperties = {
-    width: panelWidth,
-    background: "#0f172a",
-    borderLeft: "1px solid #1e293b",
-    display: "flex",
-    flexDirection: "column",
-    overflow: "hidden",
-    flexShrink: 0,
-  };
+  const containerStyle: React.CSSProperties = isMobile
+    ? {
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: "85vh",
+        background: "#0f172a",
+        borderTop: "1px solid #1e293b",
+        borderRadius: "16px 16px 0 0",
+        boxShadow: "0 -8px 32px rgba(0,0,0,0.6)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        zIndex: 50,
+      }
+    : {
+        width: panelWidth,
+        background: "#0f172a",
+        borderLeft: "1px solid #1e293b",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        flexShrink: 0,
+      };
 
   return (
     <div style={containerStyle}>
@@ -625,10 +662,13 @@ interface SkillTestPanelProps {
   conn: HassConnection;
   skill: SkillDefinition;
   panelWidth: number;
+  isMobile?: boolean;
+  isDirty?: boolean;
+  onSave: () => Promise<void>;
   onClose: () => void;
 }
 
-function SkillTestPanel({ conn, skill, panelWidth, onClose }: SkillTestPanelProps) {
+function SkillTestPanel({ conn, skill, panelWidth, isMobile, isDirty, onSave, onClose }: SkillTestPanelProps) {
   const [userInput, setUserInput] = useState("");
   const [model, setModel] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -642,7 +682,7 @@ function SkillTestPanel({ conn, skill, panelWidth, onClose }: SkillTestPanelProp
     traceEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [trace]);
 
-  const handleRun = async () => {
+  const handleRun = useCallback(async () => {
     if (!userInput.trim() || isRunning) return;
     setIsRunning(true);
     setTrace([]);
@@ -660,20 +700,41 @@ function SkillTestPanel({ conn, skill, panelWidth, onClose }: SkillTestPanelProp
     } finally {
       setIsRunning(false);
     }
-  };
+  }, [conn, skill.id, userInput, model, isRunning]);
 
-  const containerStyle: React.CSSProperties = {
-    width: panelWidth,
-    background: "#0f172a",
-    borderLeft: "1px solid #1e293b",
-    display: "flex",
-    flexDirection: "column",
-    overflow: "hidden",
-    flexShrink: 0,
+  const testContainerStyle: React.CSSProperties = isMobile
+    ? {
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: "85vh",
+        background: "#0f172a",
+        borderTop: "1px solid #1e293b",
+        borderRadius: "16px 16px 0 0",
+        boxShadow: "0 -8px 32px rgba(0,0,0,0.6)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        zIndex: 50,
+      }
+    : {
+        width: panelWidth,
+        background: "#0f172a",
+        borderLeft: "1px solid #1e293b",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        flexShrink: 0,
+      };
+
+  const handleSaveAndRun = async () => {
+    await onSave();
+    await handleRun();
   };
 
   return (
-    <div style={containerStyle}>
+    <div style={testContainerStyle}>
       {/* Header */}
       <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e293b", flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
@@ -682,6 +743,42 @@ function SkillTestPanel({ conn, skill, panelWidth, onClose }: SkillTestPanelProp
         </div>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 18 }}>✕</button>
       </div>
+
+      {/* 저장 필요 경고 */}
+      {isDirty && (
+        <div style={{
+          padding: "8px 16px",
+          background: "#1a1200",
+          borderBottom: "1px solid #3a2800",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          flexShrink: 0,
+        }}>
+          <span style={{ color: "#fbbf24", fontSize: 11, flex: 1 }}>
+            ⚠ 저장되지 않은 변경사항이 있습니다. 테스트는 마지막으로 저장된 버전으로 실행됩니다.
+          </span>
+          <button
+            onClick={handleSaveAndRun}
+            disabled={isRunning}
+            style={{
+              background: "#3a2000",
+              border: "1px solid #d97706",
+              color: "#fbbf24",
+              borderRadius: 5,
+              padding: "3px 10px",
+              cursor: "pointer",
+              fontSize: 11,
+              fontWeight: 600,
+              flexShrink: 0,
+              whiteSpace: "nowrap",
+            }}
+          >
+            저장 후 실행
+          </button>
+        </div>
+      )}
 
       {/* Input section */}
       <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e293b", flexShrink: 0 }}>
