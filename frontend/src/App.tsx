@@ -7,6 +7,7 @@ import { NodeConfigPanel } from "./components/panels/NodeConfigPanel";
 import { EdgeConfigPanel } from "./components/panels/EdgeConfigPanel";
 import { GraphSettingsPanel } from "./components/panels/GraphSettingsPanel";
 import { DebugRunPanel } from "./components/panels/DebugRunPanel";
+import { AiAssistPanel } from "./components/panels/AiAssistPanel";
 import { useGraphStore } from "./store/graphStore";
 import { useSkillStore } from "./store/skillStore";
 import { listGraphs, getGraph, saveGraph, deleteGraph, listSkills } from "./utils/haApi";
@@ -29,6 +30,7 @@ export function App({ hass }: AppProps) {
   const [showYaml, setShowYaml] = useState(false);
   const [showGraphSettings, setShowGraphSettings] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showAiAssist, setShowAiAssist] = useState(false);
   const [sidebarView, setSidebarView] = useState<"graphs" | "skills">("graphs");
   const { setSkillList } = useSkillStore();
   const {
@@ -321,6 +323,17 @@ export function App({ hass }: AppProps) {
                   </button>
 
                   <button
+                    onClick={() => setShowAiAssist(!showAiAssist)}
+                    style={{
+                      ...secondaryBtnStyle(isMobile),
+                      color: showAiAssist ? "#a78bfa" : "#64748b",
+                      borderColor: showAiAssist ? "#6d28d9" : "#334155",
+                    }}
+                  >
+                    ✨
+                  </button>
+
+                  <button
                     onClick={handleSave}
                     disabled={isSaving || !isDirty}
                     style={{
@@ -400,6 +413,19 @@ export function App({ hass }: AppProps) {
                   onClose={() => setShowGraphSettings(false)}
                   isMobile={isMobile}
                   panelWidth={panelWidth}
+                />
+              )}
+
+              {showAiAssist && !showYaml && (
+                <AiAssistPanel
+                  conn={conn}
+                  onClose={() => setShowAiAssist(false)}
+                  isMobile={isMobile}
+                  panelWidth={panelWidth}
+                  onOpenDebug={() => {
+                    setShowAiAssist(false);
+                    if (!debugMode) toggleDebugMode();
+                  }}
                 />
               )}
 

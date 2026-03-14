@@ -14,7 +14,7 @@ interface SkillWorkspaceProps {
 }
 
 export function SkillWorkspace({ conn, isMobile, onOpenSidebar }: SkillWorkspaceProps) {
-  const { editingSkill, setEditingSkill, setSkillList } = useSkillStore();
+  const { editingSkill, setEditingSkill, setSkillList, pendingAiSkillYaml, setPendingAiSkillYaml } = useSkillStore();
   const t = useLang();
 
   const [draft, setDraft] = useState<SkillDefinition | null>(editingSkill);
@@ -32,6 +32,15 @@ export function SkillWorkspace({ conn, isMobile, onOpenSidebar }: SkillWorkspace
     setTab("visual");
     setYamlError("");
   }, [editingSkill?.id]);
+
+  // AI 어시스턴트가 스킬 YAML을 생성하면 YAML 탭에 반영
+  useEffect(() => {
+    if (!pendingAiSkillYaml) return;
+    setYamlText(pendingAiSkillYaml);
+    setTab("yaml");
+    setYamlError("");
+    setPendingAiSkillYaml(null);
+  }, [pendingAiSkillYaml]);
 
   const update = (patch: Partial<SkillDefinition>) => {
     setDraft((d) => (d ? { ...d, ...patch } : d));

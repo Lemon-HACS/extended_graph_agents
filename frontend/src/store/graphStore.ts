@@ -41,6 +41,7 @@ interface GraphStore {
   setIsSaving: (saving: boolean) => void;
   markSaved: () => void;
   newGraph: () => void;
+  loadGraphFromAi: (graph: GraphDefinition) => void;
   getCurrentGraphDef: () => GraphDefinition | null;
   addNode: (type: "input" | "router" | "regular" | "output", position: { x: number; y: number }) => void;
   deleteNode: (nodeId: string) => void;
@@ -176,6 +177,23 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       flowEdges: edges,
       isDirty: true,
       selectedNodeId: null,
+    });
+  },
+
+  loadGraphFromAi: (graph) => {
+    const savedPositions = (() => {
+      try {
+        return JSON.parse(localStorage.getItem(`ega-positions-${graph.id}`) ?? "{}");
+      } catch { return {}; }
+    })();
+    const { nodes, edges } = graphToFlow(graph, savedPositions);
+    set({
+      currentGraph: graph,
+      flowNodes: nodes,
+      flowEdges: edges,
+      isDirty: true,   // loadGraph와 달리 AI 적용은 저장 전 상태
+      selectedNodeId: null,
+      selectedEdgeId: null,
     });
   },
 

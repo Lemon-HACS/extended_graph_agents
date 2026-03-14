@@ -100,6 +100,38 @@ export interface HassEntityState {
   attributes: Record<string, unknown>;
 }
 
+// ── AI 어시스턴트 ────────────────────────────────────────────────────────────
+
+export type AiAssistScope = "graph" | "node" | "skill";
+
+export interface AiAssistMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface AiAssistResult {
+  yaml: string;
+  explanation: string;
+}
+
+export async function aiAssist(
+  conn: HassConnection,
+  scope: AiAssistScope,
+  request: string,
+  currentYaml: string,
+  messages: AiAssistMessage[],
+  context: Record<string, string> = {}
+): Promise<AiAssistResult> {
+  return await conn.sendMessagePromise({
+    type: `${DOMAIN}/ai_assist`,
+    scope,
+    request,
+    current_yaml: currentYaml,
+    messages,
+    context,
+  }) as AiAssistResult;
+}
+
 export async function getStates(conn: HassConnection): Promise<HassEntityState[]> {
   const result = (await conn.sendMessagePromise({
     type: "get_states",

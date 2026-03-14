@@ -6,6 +6,8 @@ interface SkillStore {
   setSkillList: (list: SkillSummary[]) => void;
   editingSkill: SkillDefinition | null;
   setEditingSkill: (skill: SkillDefinition | null) => void;
+  pendingAiSkillYaml: string | null;
+  setPendingAiSkillYaml: (yaml: string | null) => void;
 }
 
 export const useSkillStore = create<SkillStore>((set) => ({
@@ -13,4 +15,6 @@ export const useSkillStore = create<SkillStore>((set) => ({
   setSkillList: (list) => set({ skillList: list }),
   editingSkill: null,
   setEditingSkill: (skill) => set({ editingSkill: skill }),
+  pendingAiSkillYaml: null,
+  setPendingAiSkillYaml: (yaml) => set({ pendingAiSkillYaml: yaml }),
 }));
