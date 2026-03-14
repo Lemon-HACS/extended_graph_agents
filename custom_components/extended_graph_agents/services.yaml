@@ -1,0 +1,24 @@
+run_graph:
+  name: Run Graph
+  description: >
+    Run a graph agent with the given input. The result is fired as a
+    'extended_graph_agents_execution_finished' event on the HA event bus.
+  fields:
+    graph_id:
+      name: Graph ID
+      description: The ID of the graph to run.
+      required: true
+      example: "my_smart_home_graph"
+      selector:
+        text:
+    input:
+      name: Input
+      description: >
+        Input text passed to the graph as user_input. Leave empty for
+        task-type graphs that don't need user input.
+      required: false
+      default: ""
+      example: "Check all lights and turn off any that are on"
+      selector:
+        text:
+          multiline: true
