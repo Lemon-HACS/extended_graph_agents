@@ -35,9 +35,10 @@ class SkillLoader:
 
     def __init__(self, skills_dir: str):
         self.skills_dir = Path(skills_dir)
-        self.skills_dir.mkdir(parents=True, exist_ok=True)
 
     def load_all(self) -> list[SkillDefinition]:
+        if not self.skills_dir.exists():
+            return []
         skills = []
         for path in sorted(self.skills_dir.glob("*.yaml")):
             try:
@@ -62,6 +63,7 @@ class SkillLoader:
         skill_id = skill_data.get("id", "")
         if not skill_id:
             raise InvalidSkill("Skill must have an 'id' field")
+        self.skills_dir.mkdir(parents=True, exist_ok=True)
         path = self.skills_dir / f"{skill_id}.yaml"
         with open(path, "w") as f:
             yaml.dump(skill_data, f, default_flow_style=False, allow_unicode=True)

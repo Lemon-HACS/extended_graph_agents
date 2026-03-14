@@ -49,9 +49,11 @@ async def async_setup_entry(
             [StaticPathConfig(f"/{DOMAIN}_static", str(www_dir), cache_headers=False)]
         )
 
-    # Read version for cache busting
+    # Read version for cache busting (executor to avoid blocking event loop)
     manifest_path = Path(__file__).parent / "manifest.json"
-    version = json.loads(manifest_path.read_text())["version"]
+    version = await hass.async_add_executor_job(
+        lambda: json.loads(manifest_path.read_text())["version"]
+    )
 
     # Register frontend panel
     try:

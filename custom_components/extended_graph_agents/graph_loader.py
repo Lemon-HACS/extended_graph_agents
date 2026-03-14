@@ -108,9 +108,10 @@ class GraphLoader:
 
     def __init__(self, graphs_dir: str):
         self.graphs_dir = Path(graphs_dir)
-        self.graphs_dir.mkdir(parents=True, exist_ok=True)
 
     def load_all(self) -> list[GraphDefinition]:
+        if not self.graphs_dir.exists():
+            return []
         graphs = []
         for path in sorted(self.graphs_dir.glob("*.yaml")):
             try:
@@ -135,6 +136,7 @@ class GraphLoader:
         graph_id = graph_data.get("id", "")
         if not graph_id:
             raise InvalidGraph("Graph must have an 'id' field")
+        self.graphs_dir.mkdir(parents=True, exist_ok=True)
         path = self.graphs_dir / f"{graph_id}.yaml"
         with open(path, "w") as f:
             yaml.dump(graph_data, f, default_flow_style=False, allow_unicode=True)

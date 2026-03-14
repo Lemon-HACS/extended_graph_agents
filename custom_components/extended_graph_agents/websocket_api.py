@@ -50,14 +50,14 @@ def _get_loader(hass: HomeAssistant) -> GraphLoader:
 @websocket_api.websocket_command({
     vol.Required("type"): f"{DOMAIN}/list_graphs",
 })
-@callback
-def ws_list_graphs(
+@websocket_api.async_response
+async def ws_list_graphs(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
     loader = _get_loader(hass)
-    graphs = loader.load_all()
+    graphs = await hass.async_add_executor_job(loader.load_all)
     connection.send_result(
         msg["id"],
         {
@@ -79,15 +79,15 @@ def ws_list_graphs(
     vol.Required("type"): f"{DOMAIN}/get_graph",
     vol.Required("graph_id"): str,
 })
-@callback
-def ws_get_graph(
+@websocket_api.async_response
+async def ws_get_graph(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
     loader = _get_loader(hass)
     try:
-        graph = loader.load_by_id(msg["graph_id"])
+        graph = await hass.async_add_executor_job(loader.load_by_id, msg["graph_id"])
         connection.send_result(msg["id"], {"graph": graph.to_dict()})
     except GraphNotFound as err:
         connection.send_error(msg["id"], "graph_not_found", str(err))
@@ -98,15 +98,15 @@ def ws_get_graph(
     vol.Required("type"): f"{DOMAIN}/save_graph",
     vol.Required("graph"): dict,
 })
-@callback
-def ws_save_graph(
+@websocket_api.async_response
+async def ws_save_graph(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
     loader = _get_loader(hass)
     try:
-        loader.save(msg["graph"])
+        await hass.async_add_executor_job(loader.save, msg["graph"])
         graph_data = msg["graph"]
         hass.bus.async_fire(EVENT_GRAPH_SAVED, {
             "graph_id": graph_data.get("id"),
@@ -124,15 +124,15 @@ def ws_save_graph(
     vol.Required("type"): f"{DOMAIN}/delete_graph",
     vol.Required("graph_id"): str,
 })
-@callback
-def ws_delete_graph(
+@websocket_api.async_response
+async def ws_delete_graph(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
     loader = _get_loader(hass)
     try:
-        loader.delete(msg["graph_id"])
+        await hass.async_add_executor_job(loader.delete, msg["graph_id"])
         hass.bus.async_fire(EVENT_GRAPH_DELETED, {"graph_id": msg["graph_id"]})
         connection.send_result(msg["id"], {"success": True})
     except GraphNotFound as err:
@@ -143,14 +143,14 @@ def ws_delete_graph(
 @websocket_api.websocket_command({
     vol.Required("type"): f"{DOMAIN}/list_skills",
 })
-@callback
-def ws_list_skills(
+@websocket_api.async_response
+async def ws_list_skills(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
     loader = _get_skill_loader(hass)
-    skills = loader.load_all()
+    skills = await hass.async_add_executor_job(loader.load_all)
     connection.send_result(
         msg["id"],
         {
@@ -173,15 +173,15 @@ def ws_list_skills(
     vol.Required("type"): f"{DOMAIN}/get_skill",
     vol.Required("skill_id"): str,
 })
-@callback
-def ws_get_skill(
+@websocket_api.async_response
+async def ws_get_skill(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
     loader = _get_skill_loader(hass)
     try:
-        skill = loader.load_by_id(msg["skill_id"])
+        skill = await hass.async_add_executor_job(loader.load_by_id, msg["skill_id"])
         connection.send_result(msg["id"], {"skill": skill.to_dict()})
     except SkillNotFound as err:
         connection.send_error(msg["id"], "skill_not_found", str(err))
@@ -192,15 +192,15 @@ def ws_get_skill(
     vol.Required("type"): f"{DOMAIN}/save_skill",
     vol.Required("skill"): dict,
 })
-@callback
-def ws_save_skill(
+@websocket_api.async_response
+async def ws_save_skill(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
     loader = _get_skill_loader(hass)
     try:
-        loader.save(msg["skill"])
+        await hass.async_add_executor_job(loader.save, msg["skill"])
         skill_data = msg["skill"]
         hass.bus.async_fire(EVENT_SKILL_SAVED, {
             "skill_id": skill_data.get("id"),
@@ -241,15 +241,15 @@ def ws_render_template(
     vol.Required("type"): f"{DOMAIN}/delete_skill",
     vol.Required("skill_id"): str,
 })
-@callback
-def ws_delete_skill(
+@websocket_api.async_response
+async def ws_delete_skill(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
     loader = _get_skill_loader(hass)
     try:
-        loader.delete(msg["skill_id"])
+        await hass.async_add_executor_job(loader.delete, msg["skill_id"])
         hass.bus.async_fire(EVENT_SKILL_DELETED, {"skill_id": msg["skill_id"]})
         connection.send_result(msg["id"], {"success": True})
     except SkillNotFound as err:
@@ -363,7 +363,7 @@ async def ws_run_skill_test(
 
     skill_loader = _get_skill_loader(hass)
     try:
-        skill = skill_loader.load_by_id(skill_id)
+        skill = await hass.async_add_executor_job(skill_loader.load_by_id, skill_id)
     except Exception as err:
         connection.send_error(msg["id"], "skill_not_found", str(err))
         return
@@ -610,7 +610,7 @@ async def ws_run_graph(
             # 프론트에서 현재 UI 상태의 그래프 정의를 직접 받은 경우 (미저장 변경사항 포함)
             graph = GraphDefinition(msg["graph"])
         elif "graph_id" in msg and msg["graph_id"]:
-            graph = loader.load_by_id(msg["graph_id"])
+            graph = await hass.async_add_executor_job(loader.load_by_id, msg["graph_id"])
         else:
             connection.send_error(msg["id"], "missing_param", "Either 'graph' or 'graph_id' is required")
             return

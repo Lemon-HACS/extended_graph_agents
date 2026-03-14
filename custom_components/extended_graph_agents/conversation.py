@@ -51,9 +51,9 @@ async def async_setup_entry(
     # Track active entities by graph_id
     entities: dict[str, GraphConversationEntity] = {}
 
-    # Create entities for all existing graphs
+    # Create entities for all existing graphs (executor to avoid blocking event loop)
     initial = []
-    for graph in loader.load_all():
+    for graph in await hass.async_add_executor_job(loader.load_all):
         entity = GraphConversationEntity(config_entry, graph.id, graph.name)
         entities[graph.id] = entity
         initial.append(entity)
@@ -149,7 +149,7 @@ class GraphConversationEntity(
 
         try:
             loader = GraphLoader(str(graphs_dir))
-            graph = loader.load_by_id(self.graph_id)
+            graph = await self.hass.async_add_executor_job(loader.load_by_id, self.graph_id)
             engine = GraphEngine(
                 hass=self.hass,
                 client=self._client,
