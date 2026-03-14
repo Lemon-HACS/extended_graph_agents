@@ -39,6 +39,7 @@ interface GraphStore {
   selectNode: (nodeId: string | null) => void;
   selectEdge: (edgeId: string | null) => void;
   setIsSaving: (saving: boolean) => void;
+  markSaved: () => void;
   newGraph: () => void;
   getCurrentGraphDef: () => GraphDefinition | null;
   addNode: (type: "input" | "router" | "regular" | "output", position: { x: number; y: number }) => void;
@@ -156,6 +157,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
 
   setIsSaving: (saving) => set({ isSaving: saving }),
+  markSaved: () => set({ isDirty: false, isSaving: false }),
 
   newGraph: () => {
     const id = crypto.randomUUID();

@@ -44,6 +44,7 @@ export function App({ hass }: AppProps) {
     isDirty,
     isSaving,
     setIsSaving,
+    markSaved,
     getCurrentGraphDef,
     debugMode,
     toggleDebugMode,
@@ -94,10 +95,10 @@ export function App({ hass }: AppProps) {
       await saveGraph(conn, graphDef);
       const updatedList = await listGraphs(conn);
       setGraphList(updatedList);
+      markSaved();
     } catch (err) {
-      alert(t.failedToSave(String(err)));
-    } finally {
       setIsSaving(false);
+      alert(t.failedToSave(String(err)));
     }
   }, [conn, getCurrentGraphDef, setGraphList, setIsSaving]);
 
