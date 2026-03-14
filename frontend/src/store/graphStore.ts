@@ -32,7 +32,7 @@ interface GraphStore {
 
   // Actions
   loadGraph: (graph: GraphDefinition) => void;
-  updateNodes: (nodes: Node[]) => void;
+  updateNodes: (nodes: Node[], markDirty?: boolean) => void;
   updateEdges: (edges: Edge[]) => void;
   updateNodeData: (nodeId: string, data: Partial<Record<string, unknown>>) => void;
   updateEdgeData: (edgeId: string, data: Partial<Record<string, unknown>>) => void;
@@ -108,10 +108,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     });
   },
 
-  updateNodes: (nodes) => {
+  updateNodes: (nodes, markDirty = false) => {
     const { currentGraph, selectedNodeId } = get();
     if (currentGraph) {
-      // Save positions to localStorage
+      // Save positions to localStorage (위치는 YAML에 포함되지 않으므로 dirty 마킹 불필요)
       const positions: Record<string, { x: number; y: number }> = {};
       nodes.forEach((n) => {
         positions[n.id] = n.position;
@@ -124,7 +124,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     // Auto-clear selection if selected node was removed
     const nodeIds = new Set(nodes.map((n) => n.id));
     const newSelectedNodeId = selectedNodeId && nodeIds.has(selectedNodeId) ? selectedNodeId : null;
-    set({ flowNodes: nodes, isDirty: true, selectedNodeId: newSelectedNodeId });
+    set({ flowNodes: nodes, selectedNodeId: newSelectedNodeId, ...(markDirty ? { isDirty: true } : {}) });
   },
 
   updateEdges: (edges) => set({ flowEdges: edges, isDirty: true }),
