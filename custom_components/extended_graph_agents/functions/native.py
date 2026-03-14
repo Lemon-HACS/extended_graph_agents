@@ -41,12 +41,7 @@ class NativeFunction(Function):
             else:
                 rendered_data[key] = value
 
-        # Merge with direct arguments
         service_data = {**rendered_data}
-        # Arguments from LLM that match data keys override template defaults
-        for key, value in arguments.items():
-            if key not in rendered_data:
-                service_data[key] = value
 
         try:
             await hass.services.async_call(
