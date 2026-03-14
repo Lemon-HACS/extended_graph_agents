@@ -6,7 +6,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from .const import DOMAIN, EVENT_GRAPH_SAVED, EVENT_GRAPH_DELETED, EVENT_SKILL_SAVED, EVENT_SKILL_DELETED
-from .graph_loader import GraphLoader
+from .graph_loader import GraphLoader, GraphDefinition
 from .skill_loader import SkillLoader
 from .exceptions import GraphNotFound, InvalidGraph, SkillNotFound, InvalidSkill
 
@@ -257,7 +257,8 @@ def ws_delete_skill(
 @websocket_api.require_admin
 @websocket_api.websocket_command({
     vol.Required("type"): f"{DOMAIN}/run_graph",
-    vol.Required("graph_id"): str,
+    vol.Optional("graph_id"): str,
+    vol.Optional("graph"): dict,
     vol.Required("user_input"): str,
     vol.Optional("language", default="en"): str,
 })
@@ -291,9 +292,19 @@ async def ws_run_graph(
         trace.append({"type": event.event_type, **event.data})
 
     try:
-        graph = loader.load_by_id(msg["graph_id"])
+        if "graph" in msg and msg["graph"]:
+            # 프론트에서 현재 UI 상태의 그래프 정의를 직접 받은 경우 (미저장 변경사항 포함)
+            graph = GraphDefinition(msg["graph"])
+        elif "graph_id" in msg and msg["graph_id"]:
+            graph = loader.load_by_id(msg["graph_id"])
+        else:
+            connection.send_error(msg["id"], "missing_param", "Either 'graph' or 'graph_id' is required")
+            return
     except GraphNotFound as err:
         connection.send_error(msg["id"], "graph_not_found", str(err))
+        return
+    except InvalidGraph as err:
+        connection.send_error(msg["id"], "invalid_graph", str(err))
         return
 
     state = GraphState(

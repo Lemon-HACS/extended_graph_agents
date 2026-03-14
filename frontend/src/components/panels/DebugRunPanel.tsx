@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function DebugRunPanel({ conn, onClose, isMobile, panelWidth = 380 }: Props) {
-  const { currentGraph, setDebugRunning, setDebugResult, debugRunning, debugResult } = useGraphStore();
+  const { currentGraph, getCurrentGraphDef, setDebugRunning, setDebugResult, debugRunning, debugResult } = useGraphStore();
   const [input, setInput] = useState("");
   const traceEndRef = useRef<HTMLDivElement>(null);
 
@@ -22,10 +22,12 @@ export function DebugRunPanel({ conn, onClose, isMobile, panelWidth = 380 }: Pro
 
   const handleRun = async () => {
     if (!currentGraph || !input.trim() || debugRunning) return;
+    const graphDef = getCurrentGraphDef();
+    if (!graphDef) return;
     setDebugRunning(true);
     setDebugResult(null);
     try {
-      const result = await runGraph(conn, currentGraph.id, input.trim());
+      const result = await runGraph(conn, graphDef, input.trim());
       setDebugResult(result);
     } catch (err) {
       setDebugResult({ trace: [], output: null, error: String(err) });
