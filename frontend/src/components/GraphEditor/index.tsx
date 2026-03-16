@@ -137,7 +137,7 @@ function GraphEditorInner({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditor
     (changes: NodeChange[]) => {
       // replace만 dirty로 표시 (노드 삭제 등 구조 변경 시 발생)
       // position·select·dimensions는 YAML과 무관하므로 제외
-      const shouldMarkDirty = changes.some((c) => c.type === "replace");
+      const shouldMarkDirty = changes.some((c) => c.type === "replace" || c.type === "remove");
       updateNodes(applyNodeChanges(changes, flowNodes), shouldMarkDirty);
     },
     [flowNodes, updateNodes]
