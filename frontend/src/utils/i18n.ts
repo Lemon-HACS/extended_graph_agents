@@ -153,6 +153,19 @@ const en = {
   nativeUsage: "Calls a Home Assistant service. Use for controlling lights, switches, media players, etc.",
   templateUsage: "Returns a Jinja2-rendered value. Use for reading sensor states, computing values, or formatting strings.",
   webUsage: "Makes an HTTP request to an external API. Use for fetching weather data, calling REST APIs, webhooks, etc.",
+
+  // Graph Lint/Validation
+  lintNoInput: "No input node in graph",
+  lintNoOutput: "No output node in graph",
+  lintRouterNoOutgoing: "Router/Condition has no outgoing edges",
+  lintConditionNoDefault: "Condition node has no default value",
+  lintIsolatedNode: "Node has no connections",
+  lintUnreachable: "Node is not reachable from input",
+  lintEmptyPrompt: "Node has no system prompt",
+  lintRouterNoValues: "Router has no values defined",
+  lintErrors: "errors",
+  lintWarnings: "warnings",
+  lintAllGood: "No issues",
 };
 
 const ko: typeof en = {
@@ -310,6 +323,19 @@ const ko: typeof en = {
   nativeUsage: "HA 서비스를 호출합니다. 조명 제어, 스위치 토글, 미디어 플레이어 등에 사용하세요.",
   templateUsage: "Jinja2 템플릿으로 값을 반환합니다. 센서 상태 읽기, 값 계산, 문자열 포매팅 등에 사용하세요.",
   webUsage: "외부 API에 HTTP 요청을 보냅니다. 날씨 API, REST 서비스 호출, 웹훅 등에 사용하세요.",
+
+  // Graph Lint/Validation
+  lintNoInput: "입력 노드가 없습니다",
+  lintNoOutput: "출력 노드가 없습니다",
+  lintRouterNoOutgoing: "라우터/조건 노드에 나가는 엣지가 없습니다",
+  lintConditionNoDefault: "조건 노드에 기본값이 설정되지 않았습니다",
+  lintIsolatedNode: "연결되지 않은 노드입니다",
+  lintUnreachable: "입력 노드에서 도달할 수 없습니다",
+  lintEmptyPrompt: "시스템 프롬프트가 비어있습니다",
+  lintRouterNoValues: "라우터에 values가 정의되지 않았습니다",
+  lintErrors: "오류",
+  lintWarnings: "경고",
+  lintAllGood: "문제 없음",
 };
 
 export type Translations = typeof en;

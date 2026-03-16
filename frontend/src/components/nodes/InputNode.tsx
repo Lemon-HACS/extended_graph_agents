@@ -1,6 +1,7 @@
 import { Handle, Position } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
 import { useGraphStore } from "../../store/graphStore";
+import { ValidationBadge } from "./ValidationBadge";
 
 export function InputNode({ selected, id }: NodeProps) {
   const highlighted = useGraphStore((s) => s.highlightedNodeIds.has(id));
@@ -8,6 +9,7 @@ export function InputNode({ selected, id }: NodeProps) {
   return (
     <div
       style={{
+        position: "relative",
         background: selected ? "#2d1b69" : highlighted ? "#2a1f6e" : "#1e1150",
         border: `2px solid ${selected ? "#a78bfa" : highlighted ? "#c4b5fd" : "#7c3aed"}`,
         borderRadius: 10,

@@ -23,6 +23,7 @@ import { ConditionNode } from "../nodes/ConditionNode";
 import { ConditionalEdge } from "../edges/ConditionalEdge";
 import { useGraphStore } from "../../store/graphStore";
 import { useWindowSize } from "../../hooks/useWindowSize";
+import type { ValidationWarning } from "../../utils/graphValidator";
 
 const nodeTypes = {
   routerNode: RouterNode,
@@ -110,6 +111,7 @@ function GraphEditorInner({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditor
     updateNodes,
     updateEdges,
     addNode,
+    validationWarnings,
   } = useGraphStore();
 
   const { screenToFlowPosition } = useReactFlow();
@@ -225,6 +227,11 @@ function GraphEditorInner({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditor
             <DesktopNodePalette />
           </Panel>
         )}
+
+        {/* Validation summary */}
+        <Panel position="top-right">
+          <ValidationSummary warnings={validationWarnings} onNodeClick={onNodeClick} />
+        </Panel>
       </ReactFlow>
 
       {/* 모바일: 하단 슬라이드업 팔레트 */}
@@ -381,6 +388,121 @@ interface MobileNodePaletteProps {
   onAdd: (type: PaletteNodeType) => void;
   onClose: () => void;
 }
+
+// ─── Validation 요약 패널 ─────────────────────────────────────────────────
+
+function ValidationSummary({ warnings, onNodeClick }: { warnings: ValidationWarning[]; onNodeClick: (id: string) => void }) {
+  const t = useLang();
+  const [open, setOpen] = useState(false);
+
+  const errors = warnings.filter((w) => w.severity === "error");
+  const warns = warnings.filter((w) => w.severity === "warning");
+
+  if (warnings.length === 0) {
+    return (
+      <div
+        className="nodrag nopan"
+        style={{
+          background: "#0f172a",
+          border: "1px solid #1e293b",
+          borderRadius: 8,
+          padding: "6px 12px",
+          color: "#4ade80",
+          fontSize: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        ✓ {t.lintAllGood}
+      </div>
+    );
+  }
+
+  return (
+    <div className="nodrag nopan" style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          background: "#0f172a",
+          border: `1px solid ${errors.length > 0 ? "#dc2626" : "#d97706"}`,
+          borderRadius: 8,
+          padding: "6px 12px",
+          color: "white",
+          fontSize: 12,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        {errors.length > 0 && (
+          <span style={{ color: "#ef4444" }}>
+            {errors.length} {t.lintErrors}
+          </span>
+        )}
+        {warns.length > 0 && (
+          <span style={{ color: "#fbbf24" }}>
+            {warns.length} {t.lintWarnings}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            right: 0,
+            marginTop: 4,
+            background: "#0f172a",
+            border: "1px solid #1e293b",
+            borderRadius: 8,
+            padding: 8,
+            minWidth: 260,
+            maxHeight: 300,
+            overflowY: "auto",
+            zIndex: 50,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
+          }}
+        >
+          {warnings.map((w, i) => (
+            <div
+              key={i}
+              onClick={() => {
+                if (w.nodeId) {
+                  onNodeClick(w.nodeId);
+                  setOpen(false);
+                }
+              }}
+              style={{
+                padding: "6px 8px",
+                fontSize: 11,
+                color: w.severity === "error" ? "#fca5a5" : "#fde68a",
+                cursor: w.nodeId ? "pointer" : "default",
+                borderRadius: 4,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+              onMouseOver={(e) => {
+                if (w.nodeId) (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.05)";
+              }}
+              onMouseOut={(e) => {
+                (e.currentTarget as HTMLDivElement).style.background = "transparent";
+              }}
+            >
+              <span style={{ fontSize: 10 }}>{w.severity === "error" ? "🔴" : "🟡"}</span>
+              <span>{t[w.messageKey as keyof typeof t] as string ?? w.messageKey}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── 모바일: 하단 슬라이드업 팔레트 ─────────────────────────────────────────
 
 function MobileNodePalette({ onAdd, onClose }: MobileNodePaletteProps) {
   const t = useLang();

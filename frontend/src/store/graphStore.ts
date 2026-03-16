@@ -2,6 +2,17 @@ import { create } from "zustand";
 import type { Node, Edge } from "@xyflow/react";
 import type { GraphDefinition, GraphSummary, TraceEvent, DebugRunResult } from "../types";
 import { graphToFlow, flowToGraph } from "../utils/serializer";
+import { validateGraph, type ValidationWarning } from "../utils/graphValidator";
+
+// Debounced validation
+let _validationTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleValidation(get: () => GraphStore, set: (s: Partial<GraphStore>) => void) {
+  if (_validationTimer) clearTimeout(_validationTimer);
+  _validationTimer = setTimeout(() => {
+    const { flowNodes, flowEdges } = get();
+    set({ validationWarnings: validateGraph(flowNodes, flowEdges) });
+  }, 300);
+}
 
 interface GraphStore {
   // Graph list
@@ -20,6 +31,9 @@ interface GraphStore {
   // UI state
   isDirty: boolean;
   isSaving: boolean;
+
+  // Validation
+  validationWarnings: ValidationWarning[];
 
   // Debug
   debugMode: boolean;
@@ -60,6 +74,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   isDirty: false,
   isSaving: false,
 
+  validationWarnings: [],
+
   debugMode: false,
   debugRunning: false,
   debugResult: null,
@@ -88,7 +104,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
 
   loadGraph: (graph) => {
-    // Restore saved positions from localStorage
     const savedPositions = (() => {
       try {
         return JSON.parse(
@@ -108,12 +123,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedNodeId: null,
       selectedEdgeId: null,
     });
+    scheduleValidation(get, set);
   },
 
   updateNodes: (nodes, markDirty = false) => {
     const { currentGraph, selectedNodeId } = get();
     if (currentGraph) {
-      // Save positions to localStorage (위치는 YAML에 포함되지 않으므로 dirty 마킹 불필요)
       const positions: Record<string, { x: number; y: number }> = {};
       nodes.forEach((n) => {
         positions[n.id] = n.position;
@@ -123,13 +138,16 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         JSON.stringify(positions)
       );
     }
-    // Auto-clear selection if selected node was removed
     const nodeIds = new Set(nodes.map((n) => n.id));
     const newSelectedNodeId = selectedNodeId && nodeIds.has(selectedNodeId) ? selectedNodeId : null;
     set({ flowNodes: nodes, selectedNodeId: newSelectedNodeId, ...(markDirty ? { isDirty: true } : {}) });
+    if (markDirty) scheduleValidation(get, set);
   },
 
-  updateEdges: (edges) => set({ flowEdges: edges, isDirty: true }),
+  updateEdges: (edges) => {
+    set({ flowEdges: edges, isDirty: true });
+    scheduleValidation(get, set);
+  },
 
   updateNodeData: (nodeId, data) => {
     set((state) => ({
@@ -138,6 +156,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       ),
       isDirty: true,
     }));
+    scheduleValidation(get, set);
   },
 
   updateEdgeData: (edgeId, data) => {
@@ -178,6 +197,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       isDirty: true,
       selectedNodeId: null,
     });
+    scheduleValidation(get, set);
   },
 
   loadGraphFromAi: (graph) => {
@@ -191,10 +211,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       currentGraph: graph,
       flowNodes: nodes,
       flowEdges: edges,
-      isDirty: true,   // loadGraph와 달리 AI 적용은 저장 전 상태
+      isDirty: true,
       selectedNodeId: null,
       selectedEdgeId: null,
     });
+    scheduleValidation(get, set);
   },
 
   getCurrentGraphDef: () => {
@@ -222,6 +243,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedNodeId: state.selectedNodeId === nodeId ? null : state.selectedNodeId,
       isDirty: true,
     }));
+    scheduleValidation(get, set);
   },
 
   updateGraphMeta: (meta) => {
@@ -269,5 +291,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       flowNodes: [...state.flowNodes, newNode],
       isDirty: true,
     }));
+    scheduleValidation(get, set);
   },
 }));

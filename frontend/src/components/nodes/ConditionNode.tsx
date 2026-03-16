@@ -2,6 +2,7 @@ import { Handle, Position } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
 import type { GraphNode } from "../../types";
 import { useGraphStore } from "../../store/graphStore";
+import { ValidationBadge } from "./ValidationBadge";
 
 export function ConditionNode({ data, selected, id }: NodeProps) {
   const node = data as unknown as GraphNode;
@@ -10,6 +11,7 @@ export function ConditionNode({ data, selected, id }: NodeProps) {
   return (
     <div
       style={{
+        position: "relative",
         background: selected ? "#2d1f00" : highlighted ? "#2a1e00" : "#1f1600",
         border: `2px solid ${selected ? "#fbbf24" : highlighted ? "#f59e0b" : "#d97706"}`,
         borderRadius: 10,
@@ -19,6 +21,7 @@ export function ConditionNode({ data, selected, id }: NodeProps) {
         boxShadow: selected ? "0 0 0 2px rgba(251,191,36,0.4)" : highlighted ? "0 0 0 3px rgba(245,158,11,0.5)" : "none",
       }}
     >
+      <ValidationBadge nodeId={id} />
       <Handle
         type="target"
         position={Position.Top}

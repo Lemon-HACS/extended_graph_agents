@@ -2,6 +2,7 @@ import { Handle, Position } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
 import type { GraphNode } from "../../types";
 import { useGraphStore } from "../../store/graphStore";
+import { ValidationBadge } from "./ValidationBadge";
 
 export function RegularNode({ data, selected, id }: NodeProps) {
   const node = data as unknown as GraphNode;
@@ -11,6 +12,7 @@ export function RegularNode({ data, selected, id }: NodeProps) {
   return (
     <div
       style={{
+        position: "relative",
         background: selected ? "#1a3a1a" : highlighted ? "#1a3a2a" : "#162d16",
         border: `2px solid ${selected ? "#4ade80" : highlighted ? "#86efac" : "#22c55e"}`,
         borderRadius: 10,
@@ -20,6 +22,7 @@ export function RegularNode({ data, selected, id }: NodeProps) {
         boxShadow: selected ? "0 0 0 2px rgba(74,222,128,0.4)" : highlighted ? "0 0 0 3px rgba(134,239,172,0.5)" : "none",
       }}
     >
+      <ValidationBadge nodeId={id} />
       <Handle
         type="target"
         position={Position.Top}
