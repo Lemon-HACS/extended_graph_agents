@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Node, Edge } from "@xyflow/react";
-import type { GraphDefinition, GraphSummary, TraceEvent, DebugRunResult } from "../types";
+import type { GraphDefinition, GraphSummary, TraceEvent, DebugRunResult, ExecutionHistoryEntry } from "../types";
 import { graphToFlow, flowToGraph } from "../utils/serializer";
 import { validateGraph, type ValidationWarning } from "../utils/graphValidator";
 
@@ -40,9 +40,12 @@ interface GraphStore {
   debugRunning: boolean;
   debugResult: DebugRunResult | null;
   highlightedNodeIds: Set<string>;
+  executionHistory: ExecutionHistoryEntry[];
   toggleDebugMode: () => void;
   setDebugRunning: (running: boolean) => void;
-  setDebugResult: (result: DebugRunResult | null) => void;
+  setDebugResult: (result: DebugRunResult | null, userInput?: string) => void;
+  selectHistoryEntry: (index: number) => void;
+  clearHistory: () => void;
 
   // Actions
   loadGraph: (graph: GraphDefinition) => void;
@@ -80,6 +83,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   debugRunning: false,
   debugResult: null,
   highlightedNodeIds: new Set<string>(),
+  executionHistory: [],
 
   toggleDebugMode: () => set((state) => ({
     debugMode: !state.debugMode,
@@ -91,7 +95,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
 
   setDebugRunning: (running) => set({ debugRunning: running }),
 
-  setDebugResult: (result) => {
+  setDebugResult: (result, userInput) => {
     const highlighted = new Set<string>();
     if (result?.trace) {
       for (const ev of result.trace) {
@@ -100,7 +104,48 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         }
       }
     }
-    set({ debugResult: result, highlightedNodeIds: highlighted, debugRunning: false });
+
+    // Add to history
+    const { currentGraph, executionHistory } = get();
+    let newHistory = executionHistory;
+    if (result && userInput && currentGraph) {
+      const entry: ExecutionHistoryEntry = {
+        id: crypto.randomUUID(),
+        timestamp: Date.now(),
+        input: userInput,
+        result,
+      };
+      newHistory = [...executionHistory, entry].slice(-20); // keep last 20
+      try {
+        localStorage.setItem(
+          `ega-exec-history-${currentGraph.id}`,
+          JSON.stringify(newHistory)
+        );
+      } catch { /* quota exceeded */ }
+    }
+
+    set({ debugResult: result, highlightedNodeIds: highlighted, debugRunning: false, executionHistory: newHistory });
+  },
+
+  selectHistoryEntry: (index) => {
+    const { executionHistory } = get();
+    const entry = executionHistory[index];
+    if (!entry) return;
+    const highlighted = new Set<string>();
+    for (const ev of entry.result.trace) {
+      if (ev.type === "node_finished" || ev.type === "node_error") {
+        if (ev.node_id) highlighted.add(ev.node_id);
+      }
+    }
+    set({ debugResult: entry.result, highlightedNodeIds: highlighted });
+  },
+
+  clearHistory: () => {
+    const { currentGraph } = get();
+    if (currentGraph) {
+      localStorage.removeItem(`ega-exec-history-${currentGraph.id}`);
+    }
+    set({ executionHistory: [] });
   },
 
   loadGraph: (graph) => {
@@ -115,6 +160,14 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     })();
 
     const { nodes, edges } = graphToFlow(graph, savedPositions);
+
+    // Load execution history from localStorage
+    let executionHistory: ExecutionHistoryEntry[] = [];
+    try {
+      const raw = localStorage.getItem(`ega-exec-history-${graph.id}`);
+      if (raw) executionHistory = JSON.parse(raw);
+    } catch { /* ignore */ }
+
     set({
       currentGraph: graph,
       flowNodes: nodes,
@@ -122,6 +175,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       isDirty: false,
       selectedNodeId: null,
       selectedEdgeId: null,
+      executionHistory,
     });
     scheduleValidation(get, set);
   },

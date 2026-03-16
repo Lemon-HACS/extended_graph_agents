@@ -190,6 +190,7 @@ class GraphEngine:
                         "output": result.output,
                         "duration_ms": duration_ms,
                         "variables_set": result.variables_set,
+                        "token_usage": result.token_usage,
                     },
                 )
             )

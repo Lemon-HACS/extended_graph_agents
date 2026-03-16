@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { useGraphStore } from "../../store/graphStore";
 import { runGraph } from "../../utils/haApi";
 import type { HassConnection } from "../../utils/haApi";
-import type { TraceEvent } from "../../types";
+import type { TraceEvent, TokenUsage } from "../../types";
+import { useLang } from "../../contexts/LangContext";
 
 interface Props {
   conn: HassConnection;
@@ -12,9 +13,10 @@ interface Props {
 }
 
 export function DebugRunPanel({ conn, onClose, isMobile, panelWidth = 380 }: Props) {
-  const { currentGraph, getCurrentGraphDef, setDebugRunning, setDebugResult, debugRunning, debugResult } = useGraphStore();
+  const { currentGraph, getCurrentGraphDef, setDebugRunning, setDebugResult, debugRunning, debugResult, executionHistory, selectHistoryEntry, clearHistory } = useGraphStore();
   const [input, setInput] = useState("");
   const traceEndRef = useRef<HTMLDivElement>(null);
+  const t = useLang();
 
   useEffect(() => {
     traceEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -26,11 +28,12 @@ export function DebugRunPanel({ conn, onClose, isMobile, panelWidth = 380 }: Pro
     if (!graphDef) return;
     setDebugRunning(true);
     setDebugResult(null);
+    const userInput = input.trim();
     try {
-      const result = await runGraph(conn, graphDef, input.trim());
-      setDebugResult(result);
+      const result = await runGraph(conn, graphDef, userInput);
+      setDebugResult(result, userInput);
     } catch (err) {
-      setDebugResult({ trace: [], output: null, error: String(err) });
+      setDebugResult({ trace: [], output: null, error: String(err) }, userInput);
     }
   };
 
@@ -74,6 +77,51 @@ export function DebugRunPanel({ conn, onClose, isMobile, panelWidth = 380 }: Pro
         </div>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 18 }}>✕</button>
       </div>
+
+      {/* History dropdown */}
+      {executionHistory.length > 0 && (
+        <div style={{ padding: "8px 16px", borderBottom: "1px solid #1e293b", flexShrink: 0, display: "flex", gap: 6, alignItems: "center" }}>
+          <select
+            onChange={(e) => {
+              const idx = parseInt(e.target.value);
+              if (!isNaN(idx)) selectHistoryEntry(idx);
+            }}
+            value=""
+            style={{
+              flex: 1,
+              background: "#1e293b",
+              border: "1px solid #334155",
+              borderRadius: 4,
+              color: "#94a3b8",
+              fontSize: 11,
+              padding: "4px 6px",
+              outline: "none",
+            }}
+          >
+            <option value="">{t.executionHistory} ({executionHistory.length})</option>
+            {executionHistory.map((entry, i) => (
+              <option key={entry.id} value={i}>
+                {new Date(entry.timestamp).toLocaleTimeString()} — {entry.input.slice(0, 30)}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={clearHistory}
+            style={{
+              background: "none",
+              border: "1px solid #334155",
+              color: "#64748b",
+              borderRadius: 4,
+              padding: "3px 8px",
+              cursor: "pointer",
+              fontSize: 10,
+              flexShrink: 0,
+            }}
+          >
+            {t.clearHistory}
+          </button>
+        </div>
+      )}
 
       {/* Input area */}
       <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e293b", flexShrink: 0 }}>
@@ -146,6 +194,24 @@ export function DebugRunPanel({ conn, onClose, isMobile, panelWidth = 380 }: Pro
                 </div>
               </div>
             )}
+
+            {/* Token usage summary */}
+            {debugResult.total_tokens && (
+              <div style={{
+                marginTop: 8,
+                background: "rgba(99,102,241,0.1)",
+                border: "1px solid rgba(99,102,241,0.3)",
+                borderRadius: 6,
+                padding: "8px 12px",
+                fontSize: 11,
+                color: "#a5b4fc",
+              }}>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>{t.totalTokens}</div>
+                <div>
+                  {debugResult.total_tokens.prompt_tokens.toLocaleString()} prompt + {debugResult.total_tokens.completion_tokens.toLocaleString()} completion = {debugResult.total_tokens.total_tokens.toLocaleString()} total
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -165,6 +231,7 @@ interface NodeRun {
   output?: string;
   error?: string;
   variables_set?: Record<string, unknown>;
+  token_usage?: TokenUsage;
   tools: Array<{ tool_name: string; args?: Record<string, unknown>; result?: string }>;
 }
 
@@ -187,6 +254,7 @@ function groupTrace(trace: TraceEvent[]): NodeRun[] {
         if (ev.type === "node_finished") {
           run.output = ev.output;
           run.variables_set = ev.variables_set;
+          run.token_usage = ev.token_usage;
         } else {
           run.error = ev.error;
         }
@@ -219,6 +287,8 @@ function NodeRunCard({ run }: { run: NodeRun }) {
     router: "#3b82f6",
     regular: "#22c55e",
     output: "#c2410c",
+    condition: "#d97706",
+    merge: "#06b6d4",
   };
   const color = typeColor[run.node_type] ?? "#64748b";
 
@@ -245,6 +315,9 @@ function NodeRunCard({ run }: { run: NodeRun }) {
         <span style={{ color: "white", fontSize: 12, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {run.node_name}
         </span>
+        {run.token_usage && (
+          <span style={{ color: "#6366f1", fontSize: 10, flexShrink: 0 }}>{run.token_usage.total_tokens}tok</span>
+        )}
         {run.duration_ms !== undefined && (
           <span style={{ color: "#475569", fontSize: 11, flexShrink: 0 }}>{run.duration_ms}ms</span>
         )}

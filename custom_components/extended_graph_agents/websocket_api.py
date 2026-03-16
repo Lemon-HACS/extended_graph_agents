@@ -427,11 +427,30 @@ async def ws_run_skill_test(
         connection.send_error(msg["id"], "execution_failed", str(err))
         return
 
+    total_tokens = _aggregate_token_usage(trace)
     connection.send_result(msg["id"], {
         "trace": trace,
         "output": output,
         "error": None,
+        **total_tokens,
     })
+
+
+def _aggregate_token_usage(trace: list[dict]) -> dict[str, Any]:
+    """Aggregate token usage from trace events."""
+    prompt = 0
+    completion = 0
+    for event in trace:
+        usage = event.get("token_usage")
+        if usage:
+            prompt += usage.get("prompt_tokens", 0)
+            completion += usage.get("completion_tokens", 0)
+    if not prompt and not completion:
+        return {}
+    total = prompt + completion
+    return {
+        "total_tokens": {"prompt_tokens": prompt, "completion_tokens": completion, "total_tokens": total},
+    }
 
 
 def _build_ai_assist_prompt(scope: str, context: dict[str, Any]) -> str:
@@ -648,8 +667,10 @@ async def ws_run_graph(
         connection.send_error(msg["id"], "execution_failed", str(err))
         return
 
+    total_tokens = _aggregate_token_usage(trace)
     connection.send_result(msg["id"], {
         "trace": trace,
         "output": output,
         "error": None,
+        **total_tokens,
     })

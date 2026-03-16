@@ -79,6 +79,7 @@ class RouterNode(BaseNode):
             if "reasoning_effort" in model_params:
                 router_kwargs["reasoning_effort"] = model_params["reasoning_effort"]
             response = await client.chat.completions.create(**router_kwargs)
+            usage = getattr(response, "usage", None)
             content = response.choices[0].message.content
             if not content:
                 raise RouterError(
@@ -103,8 +104,19 @@ class RouterNode(BaseNode):
         state.set(output_key, route_value)
         state.node_outputs[self.node_id] = f"Routed to: {route_value}"
 
+        token_usage = {}
+        if usage:
+            prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+            completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+            token_usage = {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            }
+
         return NodeResult(
             node_id=self.node_id,
             output=f"Router decision: {output_key}={route_value}",
             variables_set={output_key: route_value},
+            token_usage=token_usage,
         )

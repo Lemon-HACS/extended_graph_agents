@@ -109,6 +109,12 @@ export interface SkillDefinition {
   functions: FunctionTool[];
 }
 
+export interface TokenUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
 export interface TraceEvent {
   type: "node_started" | "node_finished" | "node_error" | "tool_called" | "tool_result";
   node_id?: string;
@@ -117,6 +123,7 @@ export interface TraceEvent {
   output?: string;
   duration_ms?: number;
   variables_set?: Record<string, unknown>;
+  token_usage?: TokenUsage;
   tool_name?: string;
   args?: Record<string, unknown>;
   result?: string;
@@ -127,4 +134,12 @@ export interface DebugRunResult {
   trace: TraceEvent[];
   output: string | null;
   error: string | null;
+  total_tokens?: TokenUsage;
+}
+
+export interface ExecutionHistoryEntry {
+  id: string;
+  timestamp: number;
+  input: string;
+  result: DebugRunResult;
 }

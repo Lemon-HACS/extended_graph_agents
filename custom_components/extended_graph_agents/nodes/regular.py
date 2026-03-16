@@ -135,9 +135,15 @@ class RegularNode(BaseNode):
             api_kwargs["tool_choice"] = "auto"
 
         final_response = ""
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
 
         for _ in range(max_tool_iterations):
             response = await client.chat.completions.create(**api_kwargs)
+            usage = getattr(response, "usage", None)
+            if usage:
+                total_prompt_tokens += getattr(usage, "prompt_tokens", 0) or 0
+                total_completion_tokens += getattr(usage, "completion_tokens", 0) or 0
             choice = response.choices[0]
             message = choice.message
 
@@ -234,8 +240,17 @@ class RegularNode(BaseNode):
                     final_response[:200],
                 )
 
+        token_usage = {}
+        if total_prompt_tokens or total_completion_tokens:
+            token_usage = {
+                "prompt_tokens": total_prompt_tokens,
+                "completion_tokens": total_completion_tokens,
+                "total_tokens": total_prompt_tokens + total_completion_tokens,
+            }
+
         return NodeResult(
             node_id=self.node_id,
             output=final_response,
             variables_set=variables_set,
+            token_usage=token_usage,
         )

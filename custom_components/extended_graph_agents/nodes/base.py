@@ -13,6 +13,7 @@ class NodeResult:
     node_id: str
     output: str
     variables_set: dict[str, Any] = field(default_factory=dict)
+    token_usage: dict[str, int] = field(default_factory=dict)
 
 
 class BaseNode(ABC):

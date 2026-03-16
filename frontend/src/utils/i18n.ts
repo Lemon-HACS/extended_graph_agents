@@ -174,6 +174,11 @@ const en = {
   mergeSeparator: "Separator",
   mergeHint: "Merge node combines outputs from connected nodes. Use 'concat' to join all outputs, 'last' for the most recent, or 'template' for custom Jinja2 formatting with {{ node_outputs['node_id'] }}.",
 
+  // Execution history
+  executionHistory: "Execution History",
+  clearHistory: "Clear",
+  totalTokens: "Token Usage",
+
   // Color tagging
   nodeColor: "Node Color",
   colorLabel: "Label (optional)",
@@ -355,6 +360,11 @@ const ko: typeof en = {
   mergeStrategy: "병합 전략",
   mergeSeparator: "구분자",
   mergeHint: "병합 노드는 연결된 노드의 출력을 합칩니다. 'concat'은 모든 출력을 연결, 'last'는 가장 최근 출력, 'template'은 {{ node_outputs['node_id'] }}를 사용한 Jinja2 템플릿으로 커스텀 포맷팅합니다.",
+
+  // Execution history
+  executionHistory: "실행 히스토리",
+  clearHistory: "초기화",
+  totalTokens: "토큰 사용량",
 
   // Color tagging
   nodeColor: "노드 색상",
