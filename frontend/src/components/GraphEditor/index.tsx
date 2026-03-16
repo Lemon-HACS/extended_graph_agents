@@ -20,6 +20,7 @@ import { RegularNode } from "../nodes/RegularNode";
 import { InputNode } from "../nodes/InputNode";
 import { OutputNode } from "../nodes/OutputNode";
 import { ConditionNode } from "../nodes/ConditionNode";
+import { MergeNode } from "../nodes/MergeNode";
 import { ConditionalEdge } from "../edges/ConditionalEdge";
 import { useGraphStore } from "../../store/graphStore";
 import { useWindowSize } from "../../hooks/useWindowSize";
@@ -32,6 +33,7 @@ const nodeTypes = {
   inputNode: InputNode,
   outputNode: OutputNode,
   conditionNode: ConditionNode,
+  mergeNode: MergeNode,
 };
 
 const edgeTypes = {
@@ -45,14 +47,15 @@ const defaultEdgeOptions = {
 
 // ReactFlow Panel 내부에서 React 합성 dragStart 이벤트가 안 먹히므로
 // 모듈 레벨 변수로 드래그 타입을 추적
-let _draggedNodeType: "input" | "router" | "regular" | "output" | "condition" | null = null;
+let _draggedNodeType: "input" | "router" | "regular" | "output" | "condition" | "merge" | null = null;
 
-type PaletteNodeType = "input" | "router" | "regular" | "output" | "condition";
+type PaletteNodeType = "input" | "router" | "regular" | "output" | "condition" | "merge";
 
 const PALETTE_ITEMS: { type: PaletteNodeType; icon: string; bg: string; border: string }[] = [
   { type: "input",     icon: "💬", bg: "#1e1150", border: "#7c3aed" },
   { type: "router",    icon: "🔀", bg: "#1a3050", border: "#3b82f6" },
   { type: "condition", icon: "⚡", bg: "#1f1600", border: "#d97706" },
+  { type: "merge",     icon: "🔗", bg: "#0e2a2d", border: "#06b6d4" },
   { type: "regular",   icon: "🤖", bg: "#162d16", border: "#22c55e" },
   { type: "output",    icon: "📤", bg: "#2c1a02", border: "#c2410c" },
 ];
@@ -219,6 +222,7 @@ function GraphEditorInner({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditor
             if (nd.color) return nd.color;
             return n.type === "routerNode" ? "#3b82f6"
               : n.type === "conditionNode" ? "#d97706"
+              : n.type === "mergeNode" ? "#06b6d4"
               : n.type === "inputNode" ? "#7c3aed"
               : n.type === "outputNode" ? "#c2410c"
               : "#22c55e";
@@ -299,6 +303,7 @@ function DesktopNodePalette() {
   const inputRef = useRef<HTMLDivElement>(null);
   const routerRef = useRef<HTMLDivElement>(null);
   const conditionRef = useRef<HTMLDivElement>(null);
+  const mergeRef = useRef<HTMLDivElement>(null);
   const agentRef = useRef<HTMLDivElement>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
@@ -308,6 +313,7 @@ function DesktopNodePalette() {
     const inputEl = inputRef.current;
     const routerEl = routerRef.current;
     const conditionEl = conditionRef.current;
+    const mergeEl = mergeRef.current;
     const agentEl = agentRef.current;
     const outputEl = outputRef.current;
 
@@ -323,6 +329,7 @@ function DesktopNodePalette() {
       { el: inputEl, start: makeDragStart("input") },
       { el: routerEl, start: makeDragStart("router") },
       { el: conditionEl, start: makeDragStart("condition") },
+      { el: mergeEl, start: makeDragStart("merge") },
       { el: agentEl, start: makeDragStart("regular") },
       { el: outputEl, start: makeDragStart("output") },
     ];
@@ -376,6 +383,9 @@ function DesktopNodePalette() {
       </div>
       <div ref={conditionRef} draggable style={paletteItemStyle("#1f1600", "#d97706")}>
         ⚡ {t.condition}
+      </div>
+      <div ref={mergeRef} draggable style={paletteItemStyle("#0e2a2d", "#06b6d4")}>
+        🔗 {t.merge}
       </div>
       <div ref={agentRef} draggable style={paletteItemStyle("#162d16", "#22c55e")}>
         🤖 {t.agent}
@@ -516,6 +526,7 @@ function MobileNodePalette({ onAdd, onClose }: MobileNodePaletteProps) {
     input: t.inputNode,
     router: t.router,
     condition: t.condition,
+    merge: t.merge,
     regular: t.agent,
     output: t.outputNode,
   };

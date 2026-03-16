@@ -5,6 +5,7 @@ from .regular import RegularNode
 from .input import InputNode
 from .output import OutputNode
 from .condition import ConditionNode
+from .merge import MergeNode
 
 _NODE_REGISTRY = {
     "router": RouterNode,
@@ -12,6 +13,7 @@ _NODE_REGISTRY = {
     "input": InputNode,
     "output": OutputNode,
     "condition": ConditionNode,
+    "merge": MergeNode,
 }
 
 

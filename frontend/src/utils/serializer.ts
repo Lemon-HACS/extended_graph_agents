@@ -34,7 +34,9 @@ export function graphToFlow(
             ? "outputNode"
             : node.type === "condition"
               ? "conditionNode"
-              : "regularNode",
+              : node.type === "merge"
+                ? "mergeNode"
+                : "regularNode",
     position:
       savedPositions?.[node.id] ??
       autoPositions.get(node.id) ?? { x: 0, y: 0 },

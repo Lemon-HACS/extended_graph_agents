@@ -151,6 +151,7 @@ export function NodeConfigPanel({ conn, onClose, isMobile, panelWidth = 380 }: N
               : data.type === "input" ? "💬 INPUT"
               : data.type === "output" ? "📤 OUTPUT"
               : data.type === "condition" ? "⚡ CONDITION"
+              : data.type === "merge" ? "🔗 MERGE"
               : "🤖 AGENT"}
           </div>
           <div style={{ color: "white", fontWeight: 600 }}>{t.nodeConfig}</div>
@@ -406,6 +407,25 @@ export function NodeConfigPanel({ conn, onClose, isMobile, panelWidth = 380 }: N
             </Field>
 
             <ConditionConfig data={data} update={update} conn={conn} />
+          </>
+        )}
+
+        {/* Merge node config */}
+        {data.type === "merge" && (
+          <>
+            <Field label={t.nodeId}>
+              <input value={data.id} readOnly style={inputStyle} />
+            </Field>
+
+            <Field label={t.name}>
+              <input
+                value={data.name ?? ""}
+                onChange={(e) => update("name", e.target.value)}
+                style={inputStyle}
+              />
+            </Field>
+
+            <MergeConfig data={data} update={update} conn={conn} />
           </>
         )}
       </div>
@@ -1354,6 +1374,69 @@ function SkillMultiSelect({
           </optgroup>
         ))}
       </select>
+    </div>
+  );
+}
+
+// ─── Merge Config ───────────────────────────────────────────────────────────
+
+function MergeConfig({
+  data,
+  update,
+  conn,
+}: {
+  data: GraphNode;
+  update: (field: string, value: unknown) => void;
+  conn: HassConnection;
+}) {
+  const t = useLang();
+  const strategy = data.merge_strategy ?? "concat";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <Field label={t.mergeStrategy}>
+        <select
+          value={strategy}
+          onChange={(e) => update("merge_strategy", e.target.value)}
+          style={inputStyle}
+        >
+          <option value="concat">Concat</option>
+          <option value="last">Last</option>
+          <option value="template">Template (Jinja2)</option>
+        </select>
+      </Field>
+
+      {strategy === "concat" && (
+        <Field label={t.mergeSeparator}>
+          <input
+            value={data.separator ?? "\\n\\n"}
+            onChange={(e) => update("separator", e.target.value.replace(/\\n/g, "\n"))}
+            placeholder="\n\n"
+            style={inputStyle}
+          />
+        </Field>
+      )}
+
+      {strategy === "template" && (
+        <PromptField
+          value={data.merge_template ?? ""}
+          onChange={(v) => update("merge_template", v)}
+          conn={conn}
+        />
+      )}
+
+      <div
+        style={{
+          padding: 10,
+          background: "rgba(6,182,212,0.08)",
+          borderRadius: 6,
+          color: "#64748b",
+          fontSize: 11,
+          lineHeight: 1.6,
+        }}
+      >
+        {t.mergeHint}
+      </div>
     </div>
   );
 }

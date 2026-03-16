@@ -61,6 +61,11 @@ export function validateGraph(nodes: Node[], edges: Edge[]): ValidationWarning[]
     if (data.type === "router" && (!data.values || data.values.length === 0)) {
       warnings.push({ nodeId: n.id, severity: "warning", messageKey: "lintRouterNoValues" });
     }
+
+    // Merge with fewer than 2 incoming edges
+    if (data.type === "merge" && inc < 2) {
+      warnings.push({ nodeId: n.id, severity: "warning", messageKey: "lintMergeNoIncoming" });
+    }
   }
 
   // Unreachable nodes (BFS from input)

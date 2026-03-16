@@ -165,7 +165,14 @@ const en = {
   lintRouterNoValues: "Router has no values defined",
   lintErrors: "errors",
   lintWarnings: "warnings",
+  lintMergeNoIncoming: "Merge node needs at least 2 incoming edges",
   lintAllGood: "No issues",
+
+  // Merge node
+  merge: "Merge",
+  mergeStrategy: "Merge Strategy",
+  mergeSeparator: "Separator",
+  mergeHint: "Merge node combines outputs from connected nodes. Use 'concat' to join all outputs, 'last' for the most recent, or 'template' for custom Jinja2 formatting with {{ node_outputs['node_id'] }}.",
 
   // Color tagging
   nodeColor: "Node Color",
@@ -340,7 +347,14 @@ const ko: typeof en = {
   lintRouterNoValues: "라우터에 values가 정의되지 않았습니다",
   lintErrors: "오류",
   lintWarnings: "경고",
+  lintMergeNoIncoming: "병합 노드는 최소 2개의 입력 엣지가 필요합니다",
   lintAllGood: "문제 없음",
+
+  // Merge node
+  merge: "병합",
+  mergeStrategy: "병합 전략",
+  mergeSeparator: "구분자",
+  mergeHint: "병합 노드는 연결된 노드의 출력을 합칩니다. 'concat'은 모든 출력을 연결, 'last'는 가장 최근 출력, 'template'은 {{ node_outputs['node_id'] }}를 사용한 Jinja2 템플릿으로 커스텀 포맷팅합니다.",
 
   // Color tagging
   nodeColor: "노드 색상",

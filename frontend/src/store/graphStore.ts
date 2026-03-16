@@ -57,7 +57,7 @@ interface GraphStore {
   newGraph: () => void;
   loadGraphFromAi: (graph: GraphDefinition) => void;
   getCurrentGraphDef: () => GraphDefinition | null;
-  addNode: (type: "input" | "router" | "regular" | "output" | "condition", position: { x: number; y: number }) => void;
+  addNode: (type: "input" | "router" | "regular" | "output" | "condition" | "merge", position: { x: number; y: number }) => void;
   deleteNode: (nodeId: string) => void;
   updateGraphMeta: (meta: Partial<GraphDefinition>) => void;
 }
@@ -261,6 +261,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       : type === "input" ? "inputNode"
       : type === "output" ? "outputNode"
       : type === "condition" ? "conditionNode"
+      : type === "merge" ? "mergeNode"
       : "regularNode";
 
     const defaultName =
@@ -268,12 +269,14 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       : type === "input" ? "Input"
       : type === "output" ? "Output"
       : type === "condition" ? "New Condition"
+      : type === "merge" ? "New Merge"
       : "New Agent";
 
     const extraData =
       type === "router" ? { output_key: "route", values: [] }
       : type === "regular" ? { functions: [], skills: [] }
       : type === "condition" ? { output_key: "route", conditions: [], default: "" }
+      : type === "merge" ? { merge_strategy: "concat", separator: "\n\n" }
       : {};
 
     const newNode: Node = {

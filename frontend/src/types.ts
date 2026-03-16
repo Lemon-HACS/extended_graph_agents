@@ -47,7 +47,7 @@ export interface ConditionItem {
 
 export interface GraphNode {
   id: string;
-  type: "router" | "regular" | "input" | "output" | "condition";
+  type: "router" | "regular" | "input" | "output" | "condition" | "merge";
   name: string;
   model?: string;
   model_params?: ModelParams;
@@ -63,6 +63,10 @@ export interface GraphNode {
   // Condition specific
   conditions?: ConditionItem[];
   default?: string;
+  // Merge specific
+  merge_strategy?: "concat" | "template" | "last";
+  merge_template?: string;
+  separator?: string;
   // Color tagging
   color?: string;
   color_label?: string;
