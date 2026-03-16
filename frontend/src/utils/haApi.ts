@@ -102,16 +102,25 @@ export interface HassEntityState {
 
 // ── AI 어시스턴트 ────────────────────────────────────────────────────────────
 
-export type AiAssistScope = "graph" | "node" | "skill";
+export type AiAssistScope = "graph" | "node" | "skill" | "auto";
 
 export interface AiAssistMessage {
   role: "user" | "assistant";
   content: string;
 }
 
+export interface AiAutoSkill {
+  id: string;
+  name: string;
+  yaml: string;
+}
+
 export interface AiAssistResult {
   yaml: string;
   explanation: string;
+  // auto 스코프 전용
+  skills?: AiAutoSkill[];
+  graph?: { yaml: string };
 }
 
 export async function aiAssist(

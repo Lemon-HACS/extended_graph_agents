@@ -259,7 +259,7 @@ async def ws_delete_skill(
 @websocket_api.require_admin
 @websocket_api.websocket_command({
     vol.Required("type"): f"{DOMAIN}/ai_assist",
-    vol.Required("scope"): vol.In(["graph", "node", "skill"]),
+    vol.Required("scope"): vol.In(["graph", "node", "skill", "auto"]),
     vol.Required("request"): str,
     vol.Required("current_yaml"): str,
     vol.Optional("messages", default=[]): list,
@@ -288,27 +288,18 @@ async def ws_ai_assist(
     scope = msg["scope"]
     context = msg.get("context", {})
     language = msg.get("language", "en")
+    ai_model = msg.get("model") or DEFAULT_AI_ASSIST_MODEL
+
+    # auto 스코프는 별도 처리
+    if scope == "auto":
+        await _handle_auto_generate(hass, connection, msg, client, language, ai_model)
+        return
+
     system_prompt = _build_ai_assist_prompt(scope, context, language)
 
     # HA 컨텍스트 포함
     if msg.get("include_ha_context", False):
-        states = hass.states.async_all()
-        entity_summary = "\n".join(
-            f"- {s.entity_id} ({s.attributes.get('friendly_name', '')})"
-            for s in states[:200]
-        )
-        services = hass.services.async_services()
-        service_list = "\n".join(
-            f"- {domain}.{svc}"
-            for domain, svcs in services.items()
-            for svc in svcs
-        )[:3000]
-
-        system_prompt += (
-            f"\n\n# 현재 HA 환경\n"
-            f"## 엔티티 ({len(states)}개, 일부):\n{entity_summary}\n"
-            f"## 서비스:\n{service_list}"
-        )
+        system_prompt += _build_ha_context_section(hass)
 
     history = msg.get("messages", [])[-10:]
     messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
@@ -323,7 +314,6 @@ async def ws_ai_assist(
     })
 
     try:
-        ai_model = msg.get("model") or DEFAULT_AI_ASSIST_MODEL
         response = await client.chat.completions.create(
             model=ai_model,
             messages=messages,
@@ -348,6 +338,133 @@ async def ws_ai_assist(
         connection.send_error(msg["id"], "parse_error", f"LLM 응답 파싱 실패: {err}")
     except Exception as err:
         _LOGGER.exception("AI assist error")
+        connection.send_error(msg["id"], "ai_error", str(err))
+
+
+def _build_ha_context_section(hass: HomeAssistant) -> str:
+    """HA 엔티티·서비스 컨텍스트 문자열을 생성한다."""
+    states = hass.states.async_all()
+
+    # 도메인별 엔티티 그룹핑
+    RELEVANT_DOMAINS = {
+        "light", "switch", "climate", "cover", "media_player",
+        "input_boolean", "input_number", "input_select", "input_text",
+        "script", "automation", "notify", "camera", "alarm_control_panel",
+        "lock", "fan", "vacuum", "water_heater", "humidifier", "sensor",
+        "binary_sensor", "person", "device_tracker",
+    }
+    groups: dict[str, list[str]] = {}
+    for s in states:
+        domain = s.entity_id.split(".")[0]
+        if domain in RELEVANT_DOMAINS:
+            groups.setdefault(domain, []).append(
+                f"  - {s.entity_id} ({s.attributes.get('friendly_name', '')}): {s.state}"
+            )
+
+    entity_section = "\n".join(
+        f"### {domain} ({len(items)}개)\n" + "\n".join(items[:20])
+        for domain, items in sorted(groups.items())
+        if items
+    )
+
+    # 제어 가능한 서비스만 포함
+    CONTROL_DOMAINS = {
+        "light", "switch", "climate", "cover", "media_player",
+        "input_boolean", "input_number", "input_select", "input_text",
+        "script", "automation", "notify", "lock", "fan",
+        "vacuum", "water_heater", "humidifier",
+    }
+    services = hass.services.async_services()
+    service_lines = [
+        f"- {domain}.{svc}"
+        for domain, svcs in services.items()
+        if domain in CONTROL_DOMAINS
+        for svc in svcs
+    ]
+    service_section = "\n".join(service_lines[:200])
+
+    return (
+        f"\n\n# 현재 HA 환경\n"
+        f"## 엔티티 (도메인별):\n{entity_section}\n\n"
+        f"## 제어 가능한 서비스:\n{service_section}"
+    )
+
+
+async def _handle_auto_generate(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    client: Any,
+    language: str,
+    ai_model: str,
+) -> None:
+    """Auto 스코프: Skills + Graph를 한 번에 생성한다."""
+    import json
+    import yaml as pyyaml
+
+    context = msg.get("context", {})
+    graph_id = context.get("graph_id", "")
+
+    system_prompt = _build_auto_generate_prompt(language, graph_id)
+    system_prompt += _build_ha_context_section(hass)
+
+    history = msg.get("messages", [])[-10:]
+    messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+    messages.extend(history)
+    messages.append({
+        "role": "user",
+        "content": (
+            f"요청: {msg['request']}\n\n"
+            '반드시 이 JSON 구조로만 응답하세요:\n'
+            '{"skills": [{"id": "...", "name": "...", "yaml": "..."}], '
+            '"graph": {"yaml": "..."}, "explanation": "..."}'
+        ),
+    })
+
+    try:
+        response = await client.chat.completions.create(
+            model=ai_model,
+            messages=messages,
+            response_format={"type": "json_object"},
+            max_tokens=8000,
+            temperature=0.3,
+        )
+        parsed = json.loads(response.choices[0].message.content)
+
+        # 스킬 YAML 검증
+        raw_skills = parsed.get("skills", [])
+        validated_skills = []
+        for skill_item in raw_skills:
+            skill_yaml = skill_item.get("yaml", "")
+            try:
+                pyyaml.safe_load(skill_yaml)
+                validated_skills.append({
+                    "id": skill_item.get("id", ""),
+                    "name": skill_item.get("name", ""),
+                    "yaml": skill_yaml,
+                })
+            except pyyaml.YAMLError as e:
+                _LOGGER.warning("Auto generate: skill YAML 무효 (%s): %s", skill_item.get("id"), e)
+
+        # 그래프 YAML 검증
+        graph_data = parsed.get("graph", {})
+        graph_yaml = graph_data.get("yaml", "")
+        try:
+            pyyaml.safe_load(graph_yaml)
+        except pyyaml.YAMLError as yaml_err:
+            connection.send_error(msg["id"], "invalid_yaml", f"그래프 YAML 오류: {yaml_err}")
+            return
+
+        connection.send_result(msg["id"], {
+            "skills": validated_skills,
+            "graph": {"yaml": graph_yaml},
+            "explanation": parsed.get("explanation", ""),
+        })
+
+    except json.JSONDecodeError as err:
+        connection.send_error(msg["id"], "parse_error", f"LLM 응답 파싱 실패: {err}")
+    except Exception as err:
+        _LOGGER.exception("Auto generate error")
         connection.send_error(msg["id"], "ai_error", str(err))
 
 
@@ -475,6 +592,55 @@ def _aggregate_token_usage(trace: list[dict]) -> dict[str, Any]:
     return {
         "total_tokens": {"prompt_tokens": prompt, "completion_tokens": completion, "total_tokens": total},
     }
+
+
+def _build_auto_generate_prompt(language: str, graph_id: str = "") -> str:
+    """Auto 스코프: Skills + Graph 동시 생성용 시스템 프롬프트."""
+    id_instruction = (
+        f"그래프 id는 반드시 '{graph_id}'로 설정하세요." if graph_id
+        else "그래프 id는 요청 내용을 반영한 영문 snake_case로 생성하세요 (예: smart_home_assistant)."
+    )
+    return (
+        f"당신은 Home Assistant Graph Agent 전문가입니다.\n"
+        f"사용자의 요청을 분석하고, 필요한 Skills와 실행 Graph를 함께 생성합니다.\n"
+        f"모든 텍스트(name, description, prompt 등)는 언어코드 '{language}'에 해당하는 언어로 작성하세요.\n\n"
+
+        "# 작업 순서\n"
+        "1. 사용자 요청에서 필요한 HA 기능(제어·조회·알림 등)을 파악한다\n"
+        "2. HA 환경의 엔티티·서비스를 확인해 실제 사용 가능한 것을 선택한다\n"
+        "3. 기능별로 Skill을 설계한다 (너무 세분화하지 말고 의미 있는 단위로 묶을 것)\n"
+        "4. Skill ID를 확정하고, 그 스킬을 활용하는 Graph를 설계한다\n\n"
+
+        "# Skill 작성 규칙\n"
+        "- id: 영문 snake_case, 고유하게 작성 (예: light_control, climate_control)\n"
+        "- spec.description: LLM이 언제/어떻게 이 함수를 쓸지 명확히 설명\n"
+        "- 파라미터 entity_id: description에 실제 엔티티 ID 예시 포함\n"
+        "- native 타입: service에 HA 서비스명, data에 Jinja2로 파라미터 바인딩\n"
+        "  예) data: {entity_id: \"{{ entity_id }}\", brightness_pct: \"{{ brightness_pct | default(100) }}\"}\n"
+        "- template 타입: value_template에 Jinja2로 상태 조회\n"
+        "  예) value_template: \"{{ states(entity_id) }} {{ state_attr(entity_id, 'unit_of_measurement') or '' }}\"\n\n"
+
+        "# Graph 작성 규칙\n"
+        f"- {id_instruction}\n"
+        "- 의도가 여러 개면 router로 분류 후 각 전문 regular 노드로 라우팅\n"
+        "- regular 노드의 skills에 위에서 생성한 skill id를 정확히 기재\n"
+        "- condition 없는 엣지는 fallback으로 동작\n"
+        "- system_prompt_prefix로 공통 페르소나/언어 지시 설정\n"
+        "- 노드 prompt는 역할과 제약을 구체적으로 작성, {{ user_input }} 반드시 포함\n\n"
+
+        "# Graph YAML 엣지 condition 문법\n"
+        "edges:\n"
+        "  - source: router_node\n"
+        "    target: agent_a\n"
+        "    condition: {variable: intent, value: lighting}  # router의 output_key 이름 사용\n"
+        "  - source: router_node\n"
+        "    target: fallback_agent  # condition 없음 = 아무것도 매칭 안 될 때 실행\n\n"
+
+        "# 출력 형식 (반드시 이 JSON 구조만 사용)\n"
+        '{"skills": [{"id": "...", "name": "...", "yaml": "전체 스킬 YAML"}], '
+        '"graph": {"yaml": "전체 그래프 YAML"}, '
+        '"explanation": "생성 내용 요약"}\n'
+    )
 
 
 def _build_ai_assist_prompt(scope: str, context: dict[str, Any], language: str = "en") -> str:
