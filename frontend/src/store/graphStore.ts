@@ -239,7 +239,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       id,
       name: "New Graph",
       description: "",
-      model: "gpt-4o",
+      model: "gpt-5.4",
       nodes: [],
       edges: [],
     };

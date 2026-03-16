@@ -286,7 +286,8 @@ async def ws_ai_assist(
 
     scope = msg["scope"]
     context = msg.get("context", {})
-    system_prompt = _build_ai_assist_prompt(scope, context)
+    language = msg.get("language", "en")
+    system_prompt = _build_ai_assist_prompt(scope, context, language)
 
     # HA 컨텍스트 포함
     if msg.get("include_ha_context", False):
@@ -325,7 +326,7 @@ async def ws_ai_assist(
             model=DEFAULT_CHAT_MODEL,
             messages=messages,
             response_format={"type": "json_object"},
-            max_tokens=4000,
+            max_tokens=6000,
             temperature=0.3,
         )
         parsed = json.loads(response.choices[0].message.content)
@@ -474,44 +475,83 @@ def _aggregate_token_usage(trace: list[dict]) -> dict[str, Any]:
     }
 
 
-def _build_ai_assist_prompt(scope: str, context: dict[str, Any]) -> str:
+def _build_ai_assist_prompt(scope: str, context: dict[str, Any], language: str = "en") -> str:
     """스코프별 시스템 프롬프트를 생성한다."""
+
+    # 언어에 따른 텍스트 작성 지시
+    lang_instruction = (
+        f"YAML 내의 모든 텍스트(name, description, prompt, output_template, function description 등)는 "
+        f"반드시 언어코드 '{language}'에 해당하는 언어로 작성하세요. "
+        f"(예: 'ko'이면 한국어, 'en'이면 영어)\n"
+    )
 
     base = (
         "당신은 Home Assistant Graph Agent 전문가입니다. "
         "유저의 요청을 분석해 올바른 YAML을 생성하거나 수정합니다. "
         "반드시 JSON 형식 {\"yaml\": \"...\", \"explanation\": \"...\"} 으로만 응답하세요. "
-        "explanation은 한국어로 작성하세요.\n\n"
+        "explanation은 유저 요청과 동일한 언어로 작성하세요.\n"
+        + lang_instruction + "\n"
     )
 
     if scope == "graph":
-        node_id = context.get("graph_id", "")
-        return base + f"""# Graph YAML 스키마
+        graph_id = context.get("graph_id", "")
+        return base + f"""# 그래프 설계 원칙 (반드시 준수)
+
+## 단계적 설계 방법
+YAML을 바로 작성하지 말고, 다음 순서로 설계하세요:
+1. 워크플로우의 목적과 입력/출력을 파악한다
+2. 필요한 분기(조건/라우팅)가 있는지 확인한다
+3. 병렬 처리가 필요한 작업이 있는지 확인한다
+4. 각 노드의 역할을 명확히 나눈다
+5. 노드 간 데이터 흐름을 설계한다
+
+## 노드 타입 선택 기준
+- **router**: LLM이 상황을 판단해 분기해야 할 때 (의도 분류, 도메인 분류 등)
+- **condition**: 센서 상태, 숫자 비교 등 Jinja2로 결정 가능한 규칙 기반 분기
+- **regular**: LLM이 실제 작업을 수행할 때 (답변 생성, 분석, 요약, HA 서비스 호출 등)
+- **merge**: 병렬 브랜치 결과를 하나로 합칠 때
+
+## 고품질 프롬프트 작성 규칙
+- 노드 prompt는 구체적이고 명확하게 작성 (역할, 제약, 출력 형식 명시)
+- `{{ user_input }}`을 반드시 포함
+- 이전 노드 결과는 `{{ node_outputs['노드id'] }}`로 참조
+- router/condition 분기 후 각 브랜치 노드의 프롬프트는 해당 케이스에 특화되게 작성
+- system_prompt_prefix로 공통 페르소나/지시사항을 정의하면 중복을 줄일 수 있음
+
+## 자주 쓰는 패턴
+**단순 에이전트**: input → regular → output
+**의도 분류 후 전문화**: input → router → [전문_에이전트A, 전문_에이전트B] → output
+**병렬 처리 후 합치기**: input → [에이전트A, 에이전트B] (parallel edges) → merge → output
+**HA 상태 기반 분기**: input → condition → [케이스A, 케이스B] → output
+
+---
+
+# Graph YAML 스키마
 
 ```yaml
-id: string              # 그래프 고유 ID (변경 금지)
-name: string
-description: string
-model: string           # 기본 LLM 모델 (예: gpt-4o, gpt-4o-mini)
-model_params:           # 선택사항
+id: string              # 그래프 고유 ID (기존 그래프라면 반드시 보존)
+name: string            # 그래프 이름
+description: string     # 그래프 설명
+model: string           # 기본 LLM 모델
+model_params:           # 선택사항 - 그래프 전체 기본값
   temperature: 0.0~2.0
   top_p: 0.0~1.0
   max_tokens: integer
   reasoning_effort: low|medium|high
-system_prompt_prefix: string   # 모든 노드 공통 prefix
+system_prompt_prefix: string   # 모든 노드 공통 prefix (페르소나, 공통 지시사항)
 max_tool_iterations: integer   # 기본 10
 nodes:
-  - id: string
+  - id: string          # 영문 snake_case (예: intent_router, lighting_agent)
     type: input|router|regular|output|condition|merge
     name: string
     # 노드별 추가 필드 (아래 참조)
 edges:
   - source: node_id
     target: node_id
-    mode: sequential|parallel   # 기본 sequential
-    condition:                  # 선택사항 (router 노드 출력 조건)
+    mode: sequential|parallel   # 기본 sequential. 병렬 실행 시 parallel
+    condition:                  # router/condition 분기 엣지에만 사용
       variable: string          # router의 output_key 값
-      value: string             # 매칭할 값
+      value: string             # 매칭할 값 (해당 값일 때만 이 엣지 사용)
 ```
 
 # 노드 타입별 필드
@@ -520,52 +560,62 @@ edges:
 
 **output 노드**:
 ```yaml
-output_template: |    # 선택사항. Jinja2. {{ node_outputs['node_id'] }} 로 다른 노드 출력 참조
+output_template: |    # 선택사항. Jinja2.
+  최종 답변: {{ node_outputs['last_agent'] }}
 ```
 
-**router 노드**: LLM이 라우팅 결정을 내린다.
+**router 노드**: LLM이 라우팅 결정.
 ```yaml
-prompt: |             # Jinja2 템플릿. {{ user_input }} 사용 가능
-output_key: route     # 결과를 저장할 변수명
-values:               # LLM이 선택 가능한 값 목록
-  - value1
-  - value2
+prompt: |
+  사용자의 요청을 분석해 적절한 카테고리를 선택하세요.
+  요청: {{ user_input }}
+output_key: route          # 결과 저장 변수명
+values:
+  - category_a
+  - category_b
+  - fallback
 ```
 
 **regular (agent) 노드**:
 ```yaml
-prompt: |             # Jinja2. {{ user_input }}, {{ node_outputs['id'] }}, {{ variables['id.key'] }}
+prompt: |
+  당신은 [역할]입니다. [구체적 지시사항]
+  사용자 요청: {{ user_input }}
+  # 이전 노드 결과 참조 예시:
+  # 분류 결과: {{ variables['router_node.route'] }}
+  # 이전 답변: {{ node_outputs['prev_agent'] }}
 model: string         # 선택사항. 이 노드만 다른 모델 사용
-skills:               # 재사용 가능한 스킬 ID 목록 (functions 대신 skills를 사용하세요)
+skills:               # 스킬 ID 목록 (HA 서비스 호출 등)
   - skill_id
-output_schema:        # 선택사항. JSON 구조화 출력
+output_schema:        # 선택사항. JSON 구조화 출력 시 사용
   - key: field_name
     type: string|number|integer|boolean
-    description: 설명
+    description: 필드 설명
 ```
 
-**condition 노드**: Jinja2 템플릿으로 라우팅 (LLM 없음)
+**condition 노드**: Jinja2로 분기 (LLM 없음, 빠름)
 ```yaml
-output_key: route     # 결과를 저장할 변수명
+output_key: status
 conditions:
-  - when: "{{{{ is_state('entity_id', 'on') }}}}"  # Jinja2 조건
-    value: "value1"   # 매칭 시 설정할 값
-  - when: "{{{{ is_state('entity_id', 'off') }}}}"
-    value: "value2"
-default: "fallback"   # 아무 조건도 안 맞을 때
+  - when: "{{{{ is_state('light.living_room', 'on') }}}}"
+    value: "on"
+  - when: "{{{{ states('sensor.temperature') | float > 25 }}}}"
+    value: "hot"
+default: "normal"
 ```
 
-**merge 노드**: 병렬 브랜치 출력을 합친다 (LLM 없음)
+**merge 노드**: 병렬 브랜치 합치기 (LLM 없음)
 ```yaml
-merge_strategy: concat|template|last   # 기본 concat
-separator: "\\n\\n"                    # concat일 때 구분자
-merge_template: |                      # template일 때 Jinja2
-  {{{{ node_outputs['node1'] }}}}
-  ---
-  {{{{ node_outputs['node2'] }}}}
+merge_strategy: concat|template|last
+separator: "\\n\\n---\\n\\n"
+merge_template: |       # template 전략일 때
+  ## 결과 A
+  {{{{ node_outputs['agent_a'] }}}}
+  ## 결과 B
+  {{{{ node_outputs['agent_b'] }}}}
 ```
 
-현재 그래프 ID: {node_id}
+현재 그래프 ID: {graph_id}
 전체 그래프 YAML을 반환하세요. id 필드는 반드시 보존하세요."""
 
     if scope == "node":
@@ -579,18 +629,19 @@ merge_template: |                      # template일 때 Jinja2
 **규칙:**
 - id와 type 필드는 절대 변경하지 마세요.
 - 노드 단독 YAML만 반환하세요 (전체 그래프 아님).
-- Jinja2 템플릿: {{ user_input }}, {{ node_outputs['node_id'] }}, {{ variables['node_id.key'] }}
 
-# 노드 타입별 필드
+**Jinja2 컨텍스트 변수:**
+- `{{ user_input }}` — 사용자 입력
+- `{{ node_outputs['node_id'] }}` — 다른 노드의 출력
+- `{{ variables['node_id.output_key'] }}` — router/condition 노드의 분기 결과
 
-**router**: output_key(변수명), values(선택지 목록), prompt(Jinja2)
-**regular**: prompt(Jinja2), skills(ID 목록), output_schema(구조화 출력), model(선택사항)
-**output**: output_template(Jinja2, 선택사항)
-**input**: 추가 필드 없음
-**condition**: output_key(변수명), conditions(when/value 목록, Jinja2), default(기본값)
-**merge**: merge_strategy(concat|template|last), separator(구분자), merge_template(Jinja2)
-
-스킬은 Skills 탭에서 관리하며, 노드에는 skill ID 목록만 지정합니다.
+**노드 타입별 핵심 필드:**
+- **router**: output_key(변수명), values(선택지 목록), prompt(역할과 선택지 설명 포함)
+- **regular**: prompt(구체적 역할/지시), skills(ID 목록), output_schema(구조화 출력), model(선택)
+- **output**: output_template(최종 출력 포맷, Jinja2)
+- **input**: 추가 필드 없음
+- **condition**: output_key(변수명), conditions(when/value 목록), default(기본값)
+- **merge**: merge_strategy(concat|template|last), separator, merge_template
 
 노드 YAML만 반환하세요."""
 
@@ -599,17 +650,24 @@ merge_template: |                      # template일 때 Jinja2
         skill_name = context.get("skill_name", "")
         return base + f"""# Skill YAML 스키마
 
-스킬은 AI 에이전트 노드가 재사용할 수 있는 함수 집합입니다.
+스킬은 AI 에이전트 노드가 도구(tool)로 호출할 수 있는 함수 집합입니다.
+
+**설계 원칙:**
+- spec.description은 LLM이 언제 이 함수를 써야 하는지 명확히 설명
+- 파라미터는 LLM이 추론할 수 있는 수준으로 정의
+- native 타입: HA 서비스 직접 호출 (조명, 스위치, 알림 등)
+- template 타입: HA 상태 조회 및 간단한 연산
+- web 타입: 외부 API 호출
 
 ```yaml
-id: string        # 스킬 고유 ID (변경 금지 - 기존 스킬인 경우)
+id: string        # 스킬 고유 ID (기존이면 반드시 보존)
 name: string
-group: string     # 선택사항. 그룹핑용
+group: string     # 선택사항. 그룹핑
 description: string
 functions:
   - spec:
-      name: function_name
-      description: LLM에게 제공할 함수 설명
+      name: function_name   # 영문 snake_case
+      description: "LLM에게 제공할 함수 설명 - 언제 어떻게 쓰는지 명확히"
       parameters:
         type: object
         properties:
@@ -622,7 +680,7 @@ functions:
       type: native|template|web
       # native   → service: "domain.service", data: {{param: "{{{{ param }}}}"}}
       # template → value_template: "{{{{ states('sensor.x') }}}}"
-      # web      → url: "...", method: GET|POST, headers: {{}}
+      # web      → url: "https://...", method: GET|POST, headers: {{}}
 ```
 
 현재 스킬: id={skill_id}, name={skill_name}

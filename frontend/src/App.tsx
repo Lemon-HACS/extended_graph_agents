@@ -423,6 +423,7 @@ export function App({ hass }: AppProps) {
                   onClose={() => setShowAiAssist(false)}
                   isMobile={isMobile}
                   panelWidth={panelWidth}
+                  language={hass.language ?? "en"}
                   onOpenDebug={() => {
                     setShowAiAssist(false);
                     if (!debugMode) toggleDebugMode();

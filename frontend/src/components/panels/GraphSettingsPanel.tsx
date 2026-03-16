@@ -220,7 +220,7 @@ export function GraphSettingsPanel({ onClose, isMobile, panelWidth = 380 }: Grap
           <input
             value={currentGraph.model ?? ""}
             onChange={(e) => updateGraphMeta({ model: e.target.value })}
-            placeholder="gpt-4.1"
+            placeholder="gpt-5.4"
             style={inputStyle}
           />
         </Field>

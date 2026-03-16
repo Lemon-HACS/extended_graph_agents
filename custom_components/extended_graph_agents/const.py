@@ -7,7 +7,7 @@ CONF_MAX_TOKENS = "max_tokens"
 CONF_TEMPERATURE = "temperature"
 CONF_GRAPH_ID = "graph_id"
 
-DEFAULT_CHAT_MODEL = "gpt-4o"
+DEFAULT_CHAT_MODEL = "gpt-5.4"
 DEFAULT_MAX_TOKENS = 2000
 DEFAULT_TEMPERATURE = 1.0
 DEFAULT_BASE_URL = "https://api.openai.com/v1"

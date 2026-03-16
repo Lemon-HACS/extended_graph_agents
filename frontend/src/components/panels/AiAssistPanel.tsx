@@ -22,9 +22,10 @@ interface Props {
   isMobile?: boolean;
   panelWidth?: number;
   onOpenDebug: () => void;
+  language?: string;
 }
 
-export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpenDebug }: Props) {
+export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpenDebug, language = "en" }: Props) {
   const {
     currentGraph,
     selectedNodeId,
@@ -112,7 +113,7 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
       }));
 
     try {
-      const result = await aiAssist(conn, scope, trimmed, getCurrentYaml(scope), apiHistory, getContext(scope), { include_ha_context: includeHaContext });
+      const result = await aiAssist(conn, scope, trimmed, getCurrentYaml(scope), apiHistory, getContext(scope), { include_ha_context: includeHaContext, language });
       setMessages((prev) => [
         ...prev,
         { id: crypto.randomUUID(), role: "assistant", content: result.explanation, yaml: result.yaml },
