@@ -40,9 +40,14 @@ export interface OutputSchemaField {
   enum?: string[];
 }
 
+export interface ConditionItem {
+  when: string;
+  value: string;
+}
+
 export interface GraphNode {
   id: string;
-  type: "router" | "regular" | "input" | "output";
+  type: "router" | "regular" | "input" | "output" | "condition";
   name: string;
   model?: string;
   model_params?: ModelParams;
@@ -55,6 +60,9 @@ export interface GraphNode {
   output_schema?: OutputSchemaField[];  // JSON structured output mode
   // Output node specific
   output_template?: string;
+  // Condition specific
+  conditions?: ConditionItem[];
+  default?: string;
   // UI position (not saved to YAML)
   position?: { x: number; y: number };
 }

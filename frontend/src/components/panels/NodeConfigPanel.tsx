@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { useGraphStore } from "../../store/graphStore";
 import { useSkillStore } from "../../store/skillStore";
 import { useLang } from "../../contexts/LangContext";
-import type { GraphNode, OutputSchemaField, ModelParams } from "../../types";
+import type { GraphNode, OutputSchemaField, ModelParams, ConditionItem } from "../../types";
 import { Field, inputStyle, addBtnStyle } from "../shared/FunctionEditor";
 import { renderTemplate, getStates, type HassConnection, type HassEntityState } from "../../utils/haApi";
 
@@ -150,6 +150,7 @@ export function NodeConfigPanel({ conn, onClose, isMobile, panelWidth = 380 }: N
             {data.type === "router" ? "🔀 ROUTER"
               : data.type === "input" ? "💬 INPUT"
               : data.type === "output" ? "📤 OUTPUT"
+              : data.type === "condition" ? "⚡ CONDITION"
               : "🤖 AGENT"}
           </div>
           <div style={{ color: "white", fontWeight: 600 }}>{t.nodeConfig}</div>
@@ -378,6 +379,25 @@ export function NodeConfigPanel({ conn, onClose, isMobile, panelWidth = 380 }: N
             {data.type === "regular" && (
               <RegularConfig data={data} update={update} />
             )}
+          </>
+        )}
+
+        {/* Condition node config */}
+        {data.type === "condition" && (
+          <>
+            <Field label={t.nodeId}>
+              <input value={data.id} readOnly style={inputStyle} />
+            </Field>
+
+            <Field label={t.name}>
+              <input
+                value={data.name ?? ""}
+                onChange={(e) => update("name", e.target.value)}
+                style={inputStyle}
+              />
+            </Field>
+
+            <ConditionConfig data={data} update={update} conn={conn} />
           </>
         )}
       </div>
@@ -937,6 +957,315 @@ function PromptField({
               }}
             >
               클릭하면 {"{{ states('entity_id') }}"} 형태로 커서 위치에 삽입됩니다
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConditionConfig({
+  data,
+  update,
+  conn,
+}: {
+  data: GraphNode;
+  update: (f: string, v: unknown) => void;
+  conn: HassConnection;
+}) {
+  const t = useLang();
+  const { flowEdges, flowNodes } = useGraphStore();
+  const conditions: ConditionItem[] = data.conditions ?? [];
+
+  const [previews, setPreviews] = useState<Record<number, { result: string | null; error: string | null; loading: boolean }>>({});
+  const [entityModal, setEntityModal] = useState<{ forIndex: number } | null>(null);
+  const [entities, setEntities] = useState<HassEntityState[]>([]);
+  const [entitySearch, setEntitySearch] = useState("");
+  const [loadingEntities, setLoadingEntities] = useState(false);
+
+  const textareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
+  const cursorPosRef = useRef<Record<number, number>>({});
+
+  const addCondition = () => update("conditions", [...conditions, { when: "", value: "" }]);
+
+  const updateCondition = (i: number, patch: Partial<ConditionItem>) =>
+    update("conditions", conditions.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
+
+  const removeCondition = (i: number) => {
+    update("conditions", conditions.filter((_, idx) => idx !== i));
+    setPreviews((prev) => {
+      const next = { ...prev };
+      delete next[i];
+      return next;
+    });
+  };
+
+  const handlePreview = async (i: number, whenVal: string) => {
+    setPreviews((prev) => ({ ...prev, [i]: { result: null, error: null, loading: true } }));
+    try {
+      const result = await renderTemplate(conn, whenVal);
+      setPreviews((prev) => ({ ...prev, [i]: { result, error: null, loading: false } }));
+    } catch (err) {
+      setPreviews((prev) => ({ ...prev, [i]: { result: null, error: String(err), loading: false } }));
+    }
+  };
+
+  const openEntityModal = async (i: number) => {
+    cursorPosRef.current[i] = textareaRefs.current[i]?.selectionStart ?? conditions[i].when.length;
+    setEntityModal({ forIndex: i });
+    setEntitySearch("");
+    if (entities.length === 0) {
+      setLoadingEntities(true);
+      try {
+        const states = await getStates(conn);
+        setEntities(states.sort((a, b) => a.entity_id.localeCompare(b.entity_id)));
+      } finally {
+        setLoadingEntities(false);
+      }
+    }
+  };
+
+  const insertEntity = (entityId: string, state: string) => {
+    if (entityModal === null) return;
+    const i = entityModal.forIndex;
+    const insertion = `{{ is_state('${entityId}', '${state}') }}`;
+    const current = conditions[i].when;
+    const pos = cursorPosRef.current[i] ?? current.length;
+    const newWhen = current.slice(0, pos) + insertion + current.slice(pos);
+    updateCondition(i, { when: newWhen });
+    setEntityModal(null);
+    setTimeout(() => {
+      const el = textareaRefs.current[i];
+      if (el) {
+        const newPos = pos + insertion.length;
+        el.focus();
+        el.setSelectionRange(newPos, newPos);
+        cursorPosRef.current[i] = newPos;
+      }
+    }, 0);
+  };
+
+  const filteredEntities = entities.filter((e) => {
+    const q = entitySearch.toLowerCase();
+    const friendlyName = (e.attributes?.friendly_name as string | undefined) ?? "";
+    return e.entity_id.toLowerCase().includes(q) || friendlyName.toLowerCase().includes(q);
+  });
+
+  const outgoingEdges = flowEdges.filter((e) => e.source === data.id);
+
+  return (
+    <div>
+      <Field label={t.conditionOutputKey}>
+        <input
+          value={data.output_key ?? "route"}
+          onChange={(e) => update("output_key", e.target.value)}
+          style={inputStyle}
+        />
+      </Field>
+
+      {/* Conditions list */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
+          {t.conditionItems}
+        </div>
+
+        {conditions.map((cond, i) => {
+          const preview = previews[i];
+          return (
+            <div
+              key={i}
+              style={{
+                background: "#1e293b",
+                border: "1px solid #334155",
+                borderRadius: 8,
+                padding: 10,
+                marginBottom: 8,
+              }}
+            >
+              {/* when field header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ color: "#94a3b8", fontSize: 11, fontWeight: 600 }}>
+                  {t.conditionWhen}
+                </span>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button
+                    onClick={() => openEntityModal(i)}
+                    style={smallBtnStyle}
+                    title={t.insertEntity}
+                  >
+                    🔍 {t.insertEntity}
+                  </button>
+                  <button
+                    onClick={() => handlePreview(i, cond.when)}
+                    disabled={!cond.when || preview?.loading}
+                    style={{ ...smallBtnStyle, opacity: !cond.when || preview?.loading ? 0.5 : 1 }}
+                  >
+                    {preview?.loading ? "..." : `▶ ${t.previewPrompt}`}
+                  </button>
+                  <button
+                    onClick={() => removeCondition(i)}
+                    style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 13, padding: "0 2px" }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <textarea
+                ref={(el) => { textareaRefs.current[i] = el; }}
+                value={cond.when}
+                onChange={(e) => {
+                  updateCondition(i, { when: e.target.value });
+                  setPreviews((prev) => ({ ...prev, [i]: { result: null, error: null, loading: false } }));
+                }}
+                onClick={() => { cursorPosRef.current[i] = textareaRefs.current[i]?.selectionStart ?? 0; }}
+                onKeyUp={() => { cursorPosRef.current[i] = textareaRefs.current[i]?.selectionStart ?? 0; }}
+                rows={2}
+                placeholder={t.conditionHint}
+                style={{ ...inputStyle, fontFamily: "monospace", resize: "vertical", marginBottom: 4 }}
+              />
+
+              {/* Preview result */}
+              {preview && (preview.result !== null || preview.error !== null) && (
+                <div
+                  style={{
+                    marginBottom: 6,
+                    padding: "6px 8px",
+                    background: preview.error ? "#1a0808" : "#081a0e",
+                    border: `1px solid ${preview.error ? "#7f1d1d" : "#14532d"}`,
+                    borderRadius: 5,
+                    fontSize: 11,
+                    fontFamily: "monospace",
+                    color: preview.error ? "#f87171" : "#86efac",
+                  }}
+                >
+                  <span style={{ color: preview.error ? "#ef4444" : "#22c55e", fontWeight: 700, marginRight: 4 }}>
+                    {preview.error ? `⚠ ${t.previewError}:` : `✓ ${t.previewResult}:`}
+                  </span>
+                  {preview.error ?? preview.result}
+                </div>
+              )}
+
+              {/* value field */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: "#94a3b8", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
+                  {t.conditionRouteValue}
+                </span>
+                <input
+                  value={cond.value}
+                  onChange={(e) => updateCondition(i, { value: e.target.value })}
+                  placeholder="e.g. home"
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+              </div>
+            </div>
+          );
+        })}
+
+        <button onClick={addCondition} style={addBtnStyle}>
+          {t.addCondition}
+        </button>
+      </div>
+
+      {/* Default value */}
+      <Field label={t.conditionDefault}>
+        <input
+          value={data.default ?? ""}
+          onChange={(e) => update("default", e.target.value || undefined)}
+          placeholder={t.conditionDefaultPlaceholder}
+          style={inputStyle}
+        />
+      </Field>
+
+      {/* Outgoing edges summary */}
+      {outgoingEdges.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8, fontWeight: 600 }}>
+            연결된 엣지
+          </div>
+          {outgoingEdges.map((edge) => {
+            const targetNode = flowNodes.find((n) => n.id === edge.target);
+            const targetName = ((targetNode?.data as unknown as GraphNode)?.name) || edge.target;
+            const condition = edge.data?.condition as { variable?: string; value?: string } | null;
+            const condLabel = condition?.variable ? `${condition.variable}=${condition.value}` : "default";
+            return (
+              <div
+                key={edge.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "5px 0",
+                  borderBottom: "1px solid #1e293b",
+                  fontSize: 12,
+                  color: "#94a3b8",
+                }}
+              >
+                <span style={{ color: "#64748b" }}>→</span>
+                <span style={{ color: "#86efac", flex: 1 }}>{targetName}</span>
+                <span style={{ background: "#1e293b", borderRadius: 8, padding: "1px 7px", fontSize: 11, color: "#fbbf24" }}>
+                  {condLabel}
+                </span>
+              </div>
+            );
+          })}
+          <div style={{ color: "#334155", fontSize: 11, marginTop: 8 }}>
+            엣지를 클릭하면 조건 및 모드를 설정할 수 있습니다.
+          </div>
+        </div>
+      )}
+
+      {/* Entity search modal */}
+      {entityModal !== null && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setEntityModal(null)}
+        >
+          <div
+            style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12, width: 380, maxHeight: 500, display: "flex", flexDirection: "column", overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ color: "white", fontWeight: 600, fontSize: 13 }}>🔍 {t.insertEntity}</div>
+              <button onClick={() => setEntityModal(null)} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 18 }}>✕</button>
+            </div>
+            <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e293b" }}>
+              <input
+                autoFocus
+                value={entitySearch}
+                onChange={(e) => setEntitySearch(e.target.value)}
+                placeholder={t.entitySearch}
+                style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }}
+              />
+            </div>
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              {loadingEntities ? (
+                <div style={{ padding: 20, color: "#64748b", fontSize: 12, textAlign: "center" }}>로딩 중...</div>
+              ) : filteredEntities.length === 0 ? (
+                <div style={{ padding: 20, color: "#64748b", fontSize: 12, textAlign: "center" }}>결과 없음</div>
+              ) : (
+                filteredEntities.map((entity) => (
+                  <div
+                    key={entity.entity_id}
+                    onClick={() => insertEntity(entity.entity_id, entity.state)}
+                    style={{ padding: "8px 16px", cursor: "pointer", borderBottom: "1px solid #0a1020", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = "#1e293b")}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.background = "transparent")}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: "#e2e8f0", fontFamily: "monospace" }}>{entity.entity_id}</div>
+                      {(entity.attributes?.friendly_name as string | undefined) && (
+                        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>{entity.attributes.friendly_name as string}</div>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#64748b", marginLeft: 8, flexShrink: 0 }}>{entity.state}</div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div style={{ padding: "8px 16px", borderTop: "1px solid #1e293b", color: "#334155", fontSize: 10 }}>
+              클릭하면 {"{{ is_state('entity_id', 'state') }}"} 형태로 커서 위치에 삽입됩니다
             </div>
           </div>
         </div>

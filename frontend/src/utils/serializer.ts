@@ -32,7 +32,9 @@ export function graphToFlow(
           ? "inputNode"
           : node.type === "output"
             ? "outputNode"
-            : "regularNode",
+            : node.type === "condition"
+              ? "conditionNode"
+              : "regularNode",
     position:
       savedPositions?.[node.id] ??
       autoPositions.get(node.id) ?? { x: 0, y: 0 },

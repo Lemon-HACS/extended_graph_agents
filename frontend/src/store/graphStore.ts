@@ -43,7 +43,7 @@ interface GraphStore {
   newGraph: () => void;
   loadGraphFromAi: (graph: GraphDefinition) => void;
   getCurrentGraphDef: () => GraphDefinition | null;
-  addNode: (type: "input" | "router" | "regular" | "output", position: { x: number; y: number }) => void;
+  addNode: (type: "input" | "router" | "regular" | "output" | "condition", position: { x: number; y: number }) => void;
   deleteNode: (nodeId: string) => void;
   updateGraphMeta: (meta: Partial<GraphDefinition>) => void;
 }
@@ -238,17 +238,20 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       type === "router" ? "routerNode"
       : type === "input" ? "inputNode"
       : type === "output" ? "outputNode"
+      : type === "condition" ? "conditionNode"
       : "regularNode";
 
     const defaultName =
       type === "router" ? "New Router"
       : type === "input" ? "Input"
       : type === "output" ? "Output"
+      : type === "condition" ? "New Condition"
       : "New Agent";
 
     const extraData =
       type === "router" ? { output_key: "route", values: [] }
       : type === "regular" ? { functions: [], skills: [] }
+      : type === "condition" ? { output_key: "route", conditions: [], default: "" }
       : {};
 
     const newNode: Node = {

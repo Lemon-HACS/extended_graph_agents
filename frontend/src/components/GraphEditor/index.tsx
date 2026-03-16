@@ -19,6 +19,7 @@ import { RouterNode } from "../nodes/RouterNode";
 import { RegularNode } from "../nodes/RegularNode";
 import { InputNode } from "../nodes/InputNode";
 import { OutputNode } from "../nodes/OutputNode";
+import { ConditionNode } from "../nodes/ConditionNode";
 import { ConditionalEdge } from "../edges/ConditionalEdge";
 import { useGraphStore } from "../../store/graphStore";
 import { useWindowSize } from "../../hooks/useWindowSize";
@@ -28,6 +29,7 @@ const nodeTypes = {
   regularNode: RegularNode,
   inputNode: InputNode,
   outputNode: OutputNode,
+  conditionNode: ConditionNode,
 };
 
 const edgeTypes = {
@@ -41,15 +43,16 @@ const defaultEdgeOptions = {
 
 // ReactFlow Panel 내부에서 React 합성 dragStart 이벤트가 안 먹히므로
 // 모듈 레벨 변수로 드래그 타입을 추적
-let _draggedNodeType: "input" | "router" | "regular" | "output" | null = null;
+let _draggedNodeType: "input" | "router" | "regular" | "output" | "condition" | null = null;
 
-type PaletteNodeType = "input" | "router" | "regular" | "output";
+type PaletteNodeType = "input" | "router" | "regular" | "output" | "condition";
 
 const PALETTE_ITEMS: { type: PaletteNodeType; icon: string; bg: string; border: string }[] = [
-  { type: "input",   icon: "💬", bg: "#1e1150", border: "#7c3aed" },
-  { type: "router",  icon: "🔀", bg: "#1a3050", border: "#3b82f6" },
-  { type: "regular", icon: "🤖", bg: "#162d16", border: "#22c55e" },
-  { type: "output",  icon: "📤", bg: "#2c1a02", border: "#c2410c" },
+  { type: "input",     icon: "💬", bg: "#1e1150", border: "#7c3aed" },
+  { type: "router",    icon: "🔀", bg: "#1a3050", border: "#3b82f6" },
+  { type: "condition", icon: "⚡", bg: "#1f1600", border: "#d97706" },
+  { type: "regular",   icon: "🤖", bg: "#162d16", border: "#22c55e" },
+  { type: "output",    icon: "📤", bg: "#2c1a02", border: "#c2410c" },
 ];
 
 interface GraphEditorProps {
@@ -209,7 +212,9 @@ function GraphEditorInner({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditor
         <MiniMap
           style={{ background: "#0a0f1e", border: "1px solid #1e293b" }}
           nodeColor={(n) =>
-            n.type === "routerNode" ? "#3b82f6" : "#22c55e"
+            n.type === "routerNode" ? "#3b82f6"
+            : n.type === "conditionNode" ? "#d97706"
+            : "#22c55e"
           }
         />
         <Background variant={BackgroundVariant.Dots} color="#1e293b" gap={20} />
@@ -281,6 +286,7 @@ function DesktopNodePalette() {
   const t = useLang();
   const inputRef = useRef<HTMLDivElement>(null);
   const routerRef = useRef<HTMLDivElement>(null);
+  const conditionRef = useRef<HTMLDivElement>(null);
   const agentRef = useRef<HTMLDivElement>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
@@ -289,6 +295,7 @@ function DesktopNodePalette() {
   useEffect(() => {
     const inputEl = inputRef.current;
     const routerEl = routerRef.current;
+    const conditionEl = conditionRef.current;
     const agentEl = agentRef.current;
     const outputEl = outputRef.current;
 
@@ -303,6 +310,7 @@ function DesktopNodePalette() {
     const listeners = [
       { el: inputEl, start: makeDragStart("input") },
       { el: routerEl, start: makeDragStart("router") },
+      { el: conditionEl, start: makeDragStart("condition") },
       { el: agentEl, start: makeDragStart("regular") },
       { el: outputEl, start: makeDragStart("output") },
     ];
@@ -354,6 +362,9 @@ function DesktopNodePalette() {
       <div ref={routerRef} draggable style={paletteItemStyle("#1a3050", "#3b82f6")}>
         🔀 {t.router}
       </div>
+      <div ref={conditionRef} draggable style={paletteItemStyle("#1f1600", "#d97706")}>
+        ⚡ {t.condition}
+      </div>
       <div ref={agentRef} draggable style={paletteItemStyle("#162d16", "#22c55e")}>
         🤖 {t.agent}
       </div>
@@ -377,6 +388,7 @@ function MobileNodePalette({ onAdd, onClose }: MobileNodePaletteProps) {
   const labels: Record<PaletteNodeType, string> = {
     input: t.inputNode,
     router: t.router,
+    condition: t.condition,
     regular: t.agent,
     output: t.outputNode,
   };

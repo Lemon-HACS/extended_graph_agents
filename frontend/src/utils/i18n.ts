@@ -13,6 +13,7 @@ const en = {
   tapToAdd: "TAP TO ADD",
   inputNode: "Input",
   router: "Router",
+  condition: "Condition",
   agent: "Agent",
   outputNode: "Output",
 
@@ -66,6 +67,16 @@ const en = {
   previewResult: "Preview Result",
   previewError: "Template Error",
   entitySearch: "Search entities...",
+
+  // ConditionConfig
+  conditionOutputKey: "Output Key",
+  conditionItems: "Conditions",
+  conditionWhen: "When (Jinja2)",
+  conditionRouteValue: "Value",
+  conditionDefault: "Default Value",
+  conditionDefaultPlaceholder: "Fallback value when no condition matches",
+  addCondition: "+ Add Condition",
+  conditionHint: "Jinja2 template that evaluates to true/false. e.g. {{ is_state('person.john', 'home') }}",
 
   // EdgeConfigPanel
   edgeConfig: "Edge Config",
@@ -159,6 +170,7 @@ const ko: typeof en = {
   tapToAdd: "탭하여 추가",
   inputNode: "입력",
   router: "라우터",
+  condition: "조건",
   agent: "에이전트",
   outputNode: "출력",
 
@@ -212,6 +224,16 @@ const ko: typeof en = {
   previewResult: "미리보기 결과",
   previewError: "템플릿 오류",
   entitySearch: "엔티티 검색...",
+
+  // ConditionConfig
+  conditionOutputKey: "출력 키",
+  conditionItems: "조건 목록",
+  conditionWhen: "조건식 (Jinja2)",
+  conditionRouteValue: "값",
+  conditionDefault: "기본값",
+  conditionDefaultPlaceholder: "어떤 조건도 해당 없을 때 사용되는 기본값",
+  addCondition: "+ 조건 추가",
+  conditionHint: "참/거짓으로 평가되는 Jinja2 템플릿. 예: {{ is_state('person.john', 'home') }}",
 
   // EdgeConfigPanel
   edgeConfig: "엣지 설정",
