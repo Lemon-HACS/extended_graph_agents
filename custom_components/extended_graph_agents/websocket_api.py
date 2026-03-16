@@ -266,6 +266,7 @@ async def ws_delete_skill(
     vol.Optional("context", default={}): dict,
     vol.Optional("language", default="en"): str,
     vol.Optional("include_ha_context", default=False): bool,
+    vol.Optional("model"): str,
 })
 @websocket_api.async_response
 async def ws_ai_assist(
@@ -276,7 +277,7 @@ async def ws_ai_assist(
     """AI 어시스턴트: 자연어 요청을 받아 YAML을 생성/수정해 반환."""
     import json
     import yaml as pyyaml
-    from .const import DEFAULT_CHAT_MODEL
+    from .const import DEFAULT_AI_ASSIST_MODEL
 
     entries = hass.config_entries.async_entries(DOMAIN)
     if not entries:
@@ -322,8 +323,9 @@ async def ws_ai_assist(
     })
 
     try:
+        ai_model = msg.get("model") or DEFAULT_AI_ASSIST_MODEL
         response = await client.chat.completions.create(
-            model=DEFAULT_CHAT_MODEL,
+            model=ai_model,
             messages=messages,
             response_format={"type": "json_object"},
             max_tokens=6000,

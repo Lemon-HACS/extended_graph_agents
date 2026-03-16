@@ -8,6 +8,14 @@ import type { GraphNode } from "../../types";
 import { graphToYaml, yamlToGraph } from "../../utils/serializer";
 
 const STORAGE_KEY = "ega_ai_graph_chat";
+const MODEL_STORAGE_KEY = "ega_ai_assist_model";
+const DEFAULT_AI_MODEL = "gpt-5.4";
+const AI_MODEL_PRESETS = [
+  { label: "GPT-4.1", model: "gpt-4.1" },
+  { label: "GPT-5-nano", model: "gpt-5-nano" },
+  { label: "GPT-5-mini", model: "gpt-5-mini" },
+  { label: "GPT-5.4", model: "gpt-5.4" },
+];
 
 interface ChatMessage {
   id: string;
@@ -50,6 +58,10 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [includeHaContext, setIncludeHaContext] = useState(false);
+  const [aiModel, setAiModel] = useState<string>(() => {
+    try { return localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_AI_MODEL; } catch { return DEFAULT_AI_MODEL; }
+  });
+  const [showModelInput, setShowModelInput] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -60,6 +72,11 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
       localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
     } catch {}
   }, [messages]);
+
+  const handleModelChange = (model: string) => {
+    setAiModel(model);
+    try { localStorage.setItem(MODEL_STORAGE_KEY, model); } catch {}
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -113,7 +130,7 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
       }));
 
     try {
-      const result = await aiAssist(conn, scope, trimmed, getCurrentYaml(scope), apiHistory, getContext(scope), { include_ha_context: includeHaContext, language });
+      const result = await aiAssist(conn, scope, trimmed, getCurrentYaml(scope), apiHistory, getContext(scope), { include_ha_context: includeHaContext, language, model: aiModel });
       setMessages((prev) => [
         ...prev,
         { id: crypto.randomUUID(), role: "assistant", content: result.explanation, yaml: result.yaml },
@@ -205,22 +222,84 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
       }}
     >
       {/* Header */}
-      <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e293b", flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <div style={{ color: "#a78bfa", fontSize: 11, marginBottom: 2, fontWeight: 700 }}>✨ AI 생성</div>
-          <div style={{ color: "white", fontWeight: 600, fontSize: 14 }}>AI 어시스턴트</div>
+      <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e293b", flexShrink: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ color: "#a78bfa", fontSize: 11, marginBottom: 2, fontWeight: 700 }}>✨ AI 생성</div>
+            <div style={{ color: "white", fontWeight: 600, fontSize: 14 }}>AI 어시스턴트</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {messages.length > 0 && (
+              <button
+                onClick={handleClear}
+                style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 11, padding: "2px 6px" }}
+                title="대화 기록 지우기"
+              >
+                초기화
+              </button>
+            )}
+            <button onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 18 }}>✕</button>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {messages.length > 0 && (
-            <button
-              onClick={handleClear}
-              style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 11, padding: "2px 6px" }}
-              title="대화 기록 지우기"
-            >
-              초기화
-            </button>
+
+        {/* Model selector */}
+        <div style={{ marginTop: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: showModelInput ? 6 : 0 }}>
+            <span style={{ color: "#475569", fontSize: 10 }}>모델</span>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", flex: 1 }}>
+              {AI_MODEL_PRESETS.map((p) => (
+                <button
+                  key={p.model}
+                  onClick={() => { handleModelChange(p.model); setShowModelInput(false); }}
+                  style={{
+                    padding: "2px 8px",
+                    borderRadius: 4,
+                    border: aiModel === p.model ? "1px solid #7c3aed" : "1px solid #334155",
+                    background: aiModel === p.model ? "#2e1065" : "transparent",
+                    color: aiModel === p.model ? "#a78bfa" : "#64748b",
+                    cursor: "pointer",
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+              <button
+                onClick={() => setShowModelInput(!showModelInput)}
+                style={{
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  border: showModelInput || !AI_MODEL_PRESETS.some(p => p.model === aiModel) ? "1px solid #7c3aed" : "1px solid #334155",
+                  background: showModelInput || !AI_MODEL_PRESETS.some(p => p.model === aiModel) ? "#2e1065" : "transparent",
+                  color: showModelInput || !AI_MODEL_PRESETS.some(p => p.model === aiModel) ? "#a78bfa" : "#64748b",
+                  cursor: "pointer",
+                  fontSize: 10,
+                }}
+                title="직접 입력"
+              >
+                ✏
+              </button>
+            </div>
+          </div>
+          {(showModelInput || !AI_MODEL_PRESETS.some(p => p.model === aiModel)) && (
+            <input
+              value={aiModel}
+              onChange={(e) => handleModelChange(e.target.value)}
+              placeholder="모델명 직접 입력 (예: gpt-5.4)"
+              style={{
+                width: "100%",
+                background: "#1e293b",
+                border: "1px solid #334155",
+                borderRadius: 6,
+                color: "white",
+                fontSize: 11,
+                padding: "4px 8px",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
           )}
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 18 }}>✕</button>
         </div>
       </div>
 
