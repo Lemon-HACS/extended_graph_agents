@@ -63,6 +63,9 @@ export interface GraphNode {
   // Condition specific
   conditions?: ConditionItem[];
   default?: string;
+  // Color tagging
+  color?: string;
+  color_label?: string;
   // UI position (not saved to YAML)
   position?: { x: number; y: number };
 }

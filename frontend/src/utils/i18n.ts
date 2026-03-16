@@ -166,6 +166,11 @@ const en = {
   lintErrors: "errors",
   lintWarnings: "warnings",
   lintAllGood: "No issues",
+
+  // Color tagging
+  nodeColor: "Node Color",
+  colorLabel: "Label (optional)",
+  resetColor: "Reset",
 };
 
 const ko: typeof en = {
@@ -336,6 +341,11 @@ const ko: typeof en = {
   lintErrors: "오류",
   lintWarnings: "경고",
   lintAllGood: "문제 없음",
+
+  // Color tagging
+  nodeColor: "노드 색상",
+  colorLabel: "라벨 (선택)",
+  resetColor: "초기화",
 };
 
 export type Translations = typeof en;

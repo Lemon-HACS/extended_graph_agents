@@ -24,6 +24,7 @@ import { ConditionalEdge } from "../edges/ConditionalEdge";
 import { useGraphStore } from "../../store/graphStore";
 import { useWindowSize } from "../../hooks/useWindowSize";
 import type { ValidationWarning } from "../../utils/graphValidator";
+import type { GraphNode } from "../../types";
 
 const nodeTypes = {
   routerNode: RouterNode,
@@ -213,11 +214,15 @@ function GraphEditorInner({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditor
         <Controls style={{ background: "#0f172a", border: "1px solid #1e293b" }} />
         <MiniMap
           style={{ background: "#0a0f1e", border: "1px solid #1e293b" }}
-          nodeColor={(n) =>
-            n.type === "routerNode" ? "#3b82f6"
-            : n.type === "conditionNode" ? "#d97706"
-            : "#22c55e"
-          }
+          nodeColor={(n) => {
+            const nd = n.data as unknown as GraphNode;
+            if (nd.color) return nd.color;
+            return n.type === "routerNode" ? "#3b82f6"
+              : n.type === "conditionNode" ? "#d97706"
+              : n.type === "inputNode" ? "#7c3aed"
+              : n.type === "outputNode" ? "#c2410c"
+              : "#22c55e";
+          }}
         />
         <Background variant={BackgroundVariant.Dots} color="#1e293b" gap={20} />
 

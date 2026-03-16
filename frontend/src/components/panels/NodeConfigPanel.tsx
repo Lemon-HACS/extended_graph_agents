@@ -189,6 +189,14 @@ export function NodeConfigPanel({ conn, onClose, isMobile, panelWidth = 380 }: N
 
       {/* Scrollable content */}
       <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+        {/* Color tagging — all node types */}
+        <NodeColorPicker
+          color={data.color}
+          colorLabel={data.color_label}
+          onColorChange={(c) => update("color", c)}
+          onLabelChange={(l) => update("color_label", l)}
+        />
+
         {/* Input/Output nodes */}
         {(data.type === "input" || data.type === "output") && (
           <>
@@ -1350,3 +1358,88 @@ function SkillMultiSelect({
   );
 }
 
+// ─── Node Color Picker ──────────────────────────────────────────────────────
+
+const COLOR_PRESETS = [
+  "#ef4444", "#f97316", "#eab308", "#22c55e",
+  "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899",
+];
+
+function NodeColorPicker({
+  color,
+  colorLabel,
+  onColorChange,
+  onLabelChange,
+}: {
+  color?: string;
+  colorLabel?: string;
+  onColorChange: (c: string | undefined) => void;
+  onLabelChange: (l: string | undefined) => void;
+}) {
+  const t = useLang();
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ color: "#94a3b8", fontSize: 11, fontWeight: 600, marginBottom: 6 }}>
+        {t.nodeColor}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+        {COLOR_PRESETS.map((c) => (
+          <div
+            key={c}
+            onClick={() => onColorChange(c)}
+            style={{
+              width: 20,
+              height: 20,
+              borderRadius: "50%",
+              background: c,
+              cursor: "pointer",
+              border: color === c ? "2px solid white" : "2px solid transparent",
+              boxShadow: color === c ? `0 0 0 2px ${c}` : "none",
+            }}
+          />
+        ))}
+        <input
+          type="color"
+          value={color || "#3b82f6"}
+          onChange={(e) => onColorChange(e.target.value)}
+          style={{
+            width: 20,
+            height: 20,
+            padding: 0,
+            border: "none",
+            borderRadius: "50%",
+            cursor: "pointer",
+            background: "transparent",
+          }}
+          title={t.nodeColor}
+        />
+        {color && (
+          <button
+            onClick={() => { onColorChange(undefined); onLabelChange(undefined); }}
+            style={{
+              background: "none",
+              border: "1px solid #334155",
+              color: "#64748b",
+              borderRadius: 4,
+              padding: "2px 6px",
+              cursor: "pointer",
+              fontSize: 10,
+              marginLeft: 4,
+            }}
+          >
+            {t.resetColor}
+          </button>
+        )}
+      </div>
+      {color && (
+        <input
+          value={colorLabel ?? ""}
+          onChange={(e) => onLabelChange(e.target.value || undefined)}
+          placeholder={t.colorLabel}
+          style={{ ...inputStyle, fontSize: 11 }}
+        />
+      )}
+    </div>
+  );
+}
