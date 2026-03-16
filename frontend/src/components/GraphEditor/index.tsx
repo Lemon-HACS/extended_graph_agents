@@ -64,10 +64,11 @@ interface GraphEditorProps {
   onNodeClick: (nodeId: string) => void;
   onEdgeClick?: (edgeId: string) => void;
   onPaneClick?: () => void;
+  onOpenAi?: () => void;
 }
 
-export function GraphEditor({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditorProps) {
-  const { currentGraph } = useGraphStore();
+export function GraphEditor({ onNodeClick, onEdgeClick, onPaneClick, onOpenAi }: GraphEditorProps) {
+  const { currentGraph, flowNodes: rootFlowNodes } = useGraphStore();
   const t = useLang();
 
   if (!currentGraph) {
@@ -97,6 +98,15 @@ export function GraphEditor({ onNodeClick, onEdgeClick, onPaneClick }: GraphEdit
             {t.selectOrCreate}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // Empty graph quickstart
+  if (currentGraph && rootFlowNodes.length === 0) {
+    return (
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "#020817" }}>
+        <EmptyGraphQuickstart onOpenAi={onOpenAi} />
       </div>
     );
   }
@@ -292,6 +302,161 @@ function GraphEditorInner({ onNodeClick, onEdgeClick, onPaneClick }: GraphEditor
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// ─── 빈 그래프 퀵스타트 ─────────────────────────────────────────────────────
+
+const TEMPLATES: { icon: string; labelKey: string; nodes: Array<{ type: string; name: string; [k: string]: unknown }>; edges: Array<{ source: number; target: number; [k: string]: unknown }> }[] = [
+  {
+    icon: "💬", labelKey: "templateQA",
+    nodes: [
+      { type: "input", name: "Input" },
+      { type: "regular", name: "Q&A Agent", prompt: "{{ user_input }}" },
+      { type: "output", name: "Output" },
+    ],
+    edges: [{ source: 0, target: 1 }, { source: 1, target: 2 }],
+  },
+  {
+    icon: "🔀", labelKey: "templateRouter",
+    nodes: [
+      { type: "input", name: "Input" },
+      { type: "router", name: "Router", output_key: "route", values: ["general", "technical"], prompt: "{{ user_input }}\n\n사용자 의도를 분류하세요." },
+      { type: "regular", name: "General Agent", prompt: "{{ user_input }}" },
+      { type: "regular", name: "Technical Agent", prompt: "{{ user_input }}" },
+      { type: "output", name: "Output" },
+    ],
+    edges: [
+      { source: 0, target: 1 },
+      { source: 1, target: 2, condition: { variable: "route", value: "general" } },
+      { source: 1, target: 3, condition: { variable: "route", value: "technical" } },
+      { source: 2, target: 4 },
+      { source: 3, target: 4 },
+    ],
+  },
+  {
+    icon: "⚡", labelKey: "templateCondition",
+    nodes: [
+      { type: "input", name: "Input" },
+      { type: "condition", name: "Check State", output_key: "route", conditions: [{ when: "{{ is_state('light.living_room', 'on') }}", value: "on" }], default: "off" },
+      { type: "regular", name: "On Handler", prompt: "조명이 켜져 있습니다. {{ user_input }}" },
+      { type: "regular", name: "Off Handler", prompt: "조명이 꺼져 있습니다. {{ user_input }}" },
+      { type: "output", name: "Output" },
+    ],
+    edges: [
+      { source: 0, target: 1 },
+      { source: 1, target: 2, condition: { variable: "route", value: "on" } },
+      { source: 1, target: 3, condition: { variable: "route", value: "off" } },
+      { source: 2, target: 4 },
+      { source: 3, target: 4 },
+    ],
+  },
+  {
+    icon: "🔗", labelKey: "templateMerge",
+    nodes: [
+      { type: "input", name: "Input" },
+      { type: "regular", name: "Search Agent", prompt: "{{ user_input }}에 대해 검색하세요." },
+      { type: "regular", name: "Analysis Agent", prompt: "{{ user_input }}에 대해 분석하세요." },
+      { type: "merge", name: "Merge Results", merge_strategy: "concat", separator: "\n\n---\n\n" },
+      { type: "regular", name: "Summary Agent", prompt: "다음 결과를 요약하세요:\n{{ node_outputs['merge_results'] }}" },
+      { type: "output", name: "Output" },
+    ],
+    edges: [
+      { source: 0, target: 1, mode: "parallel" },
+      { source: 0, target: 2, mode: "parallel" },
+      { source: 1, target: 3 },
+      { source: 2, target: 3 },
+      { source: 3, target: 4 },
+      { source: 4, target: 5 },
+    ],
+  },
+];
+
+function EmptyGraphQuickstart({ onOpenAi }: { onOpenAi?: () => void }) {
+  const { currentGraph, loadGraphFromAi } = useGraphStore();
+  const t = useLang();
+
+  const applyTemplate = (tmpl: typeof TEMPLATES[number]) => {
+    if (!currentGraph) return;
+    const nodeIds = tmpl.nodes.map(() => crypto.randomUUID());
+    const nodes = tmpl.nodes.map((n, i) => ({
+      id: nodeIds[i],
+      ...n,
+      position: { x: 250, y: i * 180 + 50 },
+    }));
+    // Fix merge node ID reference in summary prompt
+    const edges = tmpl.edges.map((e) => ({
+      source: nodeIds[e.source],
+      target: nodeIds[e.target],
+      ...(e.mode ? { mode: e.mode } : {}),
+      ...(e.condition ? { condition: e.condition } : {}),
+    }));
+    loadGraphFromAi({
+      ...currentGraph,
+      nodes: nodes as any,
+      edges: edges as any,
+    });
+  };
+
+  return (
+    <div style={{ textAlign: "center", padding: 32, maxWidth: 400 }}>
+      <div style={{ fontSize: 40, marginBottom: 16 }}>🚀</div>
+      <div style={{ color: "#e2e8f0", fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+        {t.quickstartTitle}
+      </div>
+      <div style={{ color: "#64748b", fontSize: 13, marginBottom: 24 }}>
+        {t.quickstartSubtitle}
+      </div>
+
+      {onOpenAi && (
+        <button
+          onClick={onOpenAi}
+          style={{
+            width: "100%",
+            padding: "12px",
+            background: "#2e1065",
+            border: "1px solid #6d28d9",
+            borderRadius: 8,
+            color: "#a78bfa",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+            marginBottom: 20,
+          }}
+        >
+          ✨ {t.quickstartAi}
+        </button>
+      )}
+
+      <div style={{ color: "#475569", fontSize: 12, marginBottom: 12 }}>
+        {t.quickstartOrTemplate}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {TEMPLATES.map((tmpl, i) => (
+          <button
+            key={i}
+            onClick={() => applyTemplate(tmpl)}
+            style={{
+              padding: "12px 8px",
+              background: "#0f172a",
+              border: "1px solid #1e293b",
+              borderRadius: 8,
+              color: "#e2e8f0",
+              fontSize: 12,
+              cursor: "pointer",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <span style={{ fontSize: 24 }}>{tmpl.icon}</span>
+            <span>{t[tmpl.labelKey as keyof typeof t] as string}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

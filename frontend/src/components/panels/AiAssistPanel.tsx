@@ -48,6 +48,7 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [includeHaContext, setIncludeHaContext] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -111,7 +112,7 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
       }));
 
     try {
-      const result = await aiAssist(conn, scope, trimmed, getCurrentYaml(scope), apiHistory, getContext(scope));
+      const result = await aiAssist(conn, scope, trimmed, getCurrentYaml(scope), apiHistory, getContext(scope), { include_ha_context: includeHaContext });
       setMessages((prev) => [
         ...prev,
         { id: crypto.randomUUID(), role: "assistant", content: result.explanation, yaml: result.yaml },
@@ -252,6 +253,15 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
             📌 {scopeLabel}
           </div>
         ) : null}
+        <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={includeHaContext}
+            onChange={(e) => setIncludeHaContext(e.target.checked)}
+            style={{ width: 14, height: 14, accentColor: "#a78bfa", cursor: "pointer" }}
+          />
+          <span style={{ color: "#64748b", fontSize: 11 }}>HA 컨텍스트 포함 (엔티티/서비스 목록)</span>
+        </label>
       </div>
 
       {/* Chat area */}

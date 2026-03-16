@@ -265,6 +265,7 @@ async def ws_delete_skill(
     vol.Optional("messages", default=[]): list,
     vol.Optional("context", default={}): dict,
     vol.Optional("language", default="en"): str,
+    vol.Optional("include_ha_context", default=False): bool,
 })
 @websocket_api.async_response
 async def ws_ai_assist(
@@ -286,6 +287,26 @@ async def ws_ai_assist(
     scope = msg["scope"]
     context = msg.get("context", {})
     system_prompt = _build_ai_assist_prompt(scope, context)
+
+    # HA 컨텍스트 포함
+    if msg.get("include_ha_context", False):
+        states = hass.states.async_all()
+        entity_summary = "\n".join(
+            f"- {s.entity_id} ({s.attributes.get('friendly_name', '')})"
+            for s in states[:200]
+        )
+        services = hass.services.async_services()
+        service_list = "\n".join(
+            f"- {domain}.{svc}"
+            for domain, svcs in services.items()
+            for svc in svcs
+        )[:3000]
+
+        system_prompt += (
+            f"\n\n# 현재 HA 환경\n"
+            f"## 엔티티 ({len(states)}개, 일부):\n{entity_summary}\n"
+            f"## 서비스:\n{service_list}"
+        )
 
     history = msg.get("messages", [])[-10:]
     messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
@@ -481,7 +502,7 @@ system_prompt_prefix: string   # 모든 노드 공통 prefix
 max_tool_iterations: integer   # 기본 10
 nodes:
   - id: string
-    type: input|router|regular|output
+    type: input|router|regular|output|condition|merge
     name: string
     # 노드별 추가 필드 (아래 참조)
 edges:
@@ -523,6 +544,27 @@ output_schema:        # 선택사항. JSON 구조화 출력
     description: 설명
 ```
 
+**condition 노드**: Jinja2 템플릿으로 라우팅 (LLM 없음)
+```yaml
+output_key: route     # 결과를 저장할 변수명
+conditions:
+  - when: "{{{{ is_state('entity_id', 'on') }}}}"  # Jinja2 조건
+    value: "value1"   # 매칭 시 설정할 값
+  - when: "{{{{ is_state('entity_id', 'off') }}}}"
+    value: "value2"
+default: "fallback"   # 아무 조건도 안 맞을 때
+```
+
+**merge 노드**: 병렬 브랜치 출력을 합친다 (LLM 없음)
+```yaml
+merge_strategy: concat|template|last   # 기본 concat
+separator: "\\n\\n"                    # concat일 때 구분자
+merge_template: |                      # template일 때 Jinja2
+  {{{{ node_outputs['node1'] }}}}
+  ---
+  {{{{ node_outputs['node2'] }}}}
+```
+
 현재 그래프 ID: {node_id}
 전체 그래프 YAML을 반환하세요. id 필드는 반드시 보존하세요."""
 
@@ -545,6 +587,8 @@ output_schema:        # 선택사항. JSON 구조화 출력
 **regular**: prompt(Jinja2), skills(ID 목록), output_schema(구조화 출력), model(선택사항)
 **output**: output_template(Jinja2, 선택사항)
 **input**: 추가 필드 없음
+**condition**: output_key(변수명), conditions(when/value 목록, Jinja2), default(기본값)
+**merge**: merge_strategy(concat|template|last), separator(구분자), merge_template(Jinja2)
 
 스킬은 Skills 탭에서 관리하며, 노드에는 skill ID 목록만 지정합니다.
 

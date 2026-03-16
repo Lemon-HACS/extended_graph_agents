@@ -174,6 +174,16 @@ const en = {
   mergeSeparator: "Separator",
   mergeHint: "Merge node combines outputs from connected nodes. Use 'concat' to join all outputs, 'last' for the most recent, or 'template' for custom Jinja2 formatting with {{ node_outputs['node_id'] }}.",
 
+  // Quickstart
+  quickstartTitle: "Get Started",
+  quickstartSubtitle: "Describe what this graph should do, or pick a template",
+  quickstartAi: "Describe with AI",
+  quickstartOrTemplate: "Or start from a template:",
+  templateQA: "Q&A Bot",
+  templateRouter: "Smart Router",
+  templateCondition: "Condition Router",
+  templateMerge: "Parallel Merge",
+
   // Execution history
   executionHistory: "Execution History",
   clearHistory: "Clear",
@@ -360,6 +370,16 @@ const ko: typeof en = {
   mergeStrategy: "병합 전략",
   mergeSeparator: "구분자",
   mergeHint: "병합 노드는 연결된 노드의 출력을 합칩니다. 'concat'은 모든 출력을 연결, 'last'는 가장 최근 출력, 'template'은 {{ node_outputs['node_id'] }}를 사용한 Jinja2 템플릿으로 커스텀 포맷팅합니다.",
+
+  // Quickstart
+  quickstartTitle: "시작하기",
+  quickstartSubtitle: "이 그래프가 무엇을 하면 좋겠는지 설명하거나, 템플릿을 선택하세요",
+  quickstartAi: "AI로 설명해서 생성",
+  quickstartOrTemplate: "또는 템플릿으로 시작:",
+  templateQA: "Q&A 봇",
+  templateRouter: "스마트 라우터",
+  templateCondition: "조건 라우터",
+  templateMerge: "병렬 병합",
 
   // Execution history
   executionHistory: "실행 히스토리",

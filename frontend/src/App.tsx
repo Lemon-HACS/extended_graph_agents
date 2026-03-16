@@ -379,6 +379,7 @@ export function App({ hass }: AppProps) {
                     selectNode(null);
                     selectEdge(null);
                   }}
+                  onOpenAi={() => setShowAiAssist(true)}
                 />
               )}
 

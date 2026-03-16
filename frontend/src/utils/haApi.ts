@@ -120,7 +120,8 @@ export async function aiAssist(
   request: string,
   currentYaml: string,
   messages: AiAssistMessage[],
-  context: Record<string, string> = {}
+  context: Record<string, string> = {},
+  options: { include_ha_context?: boolean } = {}
 ): Promise<AiAssistResult> {
   return await conn.sendMessagePromise({
     type: `${DOMAIN}/ai_assist`,
@@ -129,6 +130,7 @@ export async function aiAssist(
     current_yaml: currentYaml,
     messages,
     context,
+    ...options,
   }) as AiAssistResult;
 }
 
