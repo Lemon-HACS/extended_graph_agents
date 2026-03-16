@@ -4,12 +4,14 @@ from .router import RouterNode
 from .regular import RegularNode
 from .input import InputNode
 from .output import OutputNode
+from .condition import ConditionNode
 
 _NODE_REGISTRY = {
     "router": RouterNode,
     "regular": RegularNode,
     "input": InputNode,
     "output": OutputNode,
+    "condition": ConditionNode,
 }
 
 
