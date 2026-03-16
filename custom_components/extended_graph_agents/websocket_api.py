@@ -480,7 +480,6 @@ def _aggregate_token_usage(trace: list[dict]) -> dict[str, Any]:
 def _build_ai_assist_prompt(scope: str, context: dict[str, Any], language: str = "en") -> str:
     """스코프별 시스템 프롬프트를 생성한다."""
 
-    # 언어에 따른 텍스트 작성 지시
     lang_instruction = (
         f"YAML 내의 모든 텍스트(name, description, prompt, output_template, function description 등)는 "
         f"반드시 언어코드 '{language}'에 해당하는 언어로 작성하세요. "
@@ -497,124 +496,245 @@ def _build_ai_assist_prompt(scope: str, context: dict[str, Any], language: str =
 
     if scope == "graph":
         graph_id = context.get("graph_id", "")
-        return base + f"""# 그래프 설계 원칙 (반드시 준수)
-
-## 단계적 설계 방법
-YAML을 바로 작성하지 말고, 다음 순서로 설계하세요:
-1. 워크플로우의 목적과 입력/출력을 파악한다
-2. 필요한 분기(조건/라우팅)가 있는지 확인한다
-3. 병렬 처리가 필요한 작업이 있는지 확인한다
-4. 각 노드의 역할을 명확히 나눈다
-5. 노드 간 데이터 흐름을 설계한다
+        return base + f"""# 설계 원칙
 
 ## 노드 타입 선택 기준
-- **router**: LLM이 상황을 판단해 분기해야 할 때 (의도 분류, 도메인 분류 등)
-- **condition**: 센서 상태, 숫자 비교 등 Jinja2로 결정 가능한 규칙 기반 분기
-- **regular**: LLM이 실제 작업을 수행할 때 (답변 생성, 분석, 요약, HA 서비스 호출 등)
-- **merge**: 병렬 브랜치 결과를 하나로 합칠 때
+- **router**: LLM이 의도/도메인을 판단해 분기 (예: 조명 제어 vs 일반 질문)
+- **condition**: 센서 상태·시간 등 Jinja2로 결정 가능한 규칙 기반 분기 (LLM 미사용, 빠름)
+- **regular**: LLM이 실제 작업 수행 (답변 생성, 분석, HA 서비스 호출 등)
+- **merge**: 병렬 브랜치 결과를 하나로 합치기 (LLM 미사용)
 
-## 고품질 프롬프트 작성 규칙
-- 노드 prompt는 구체적이고 명확하게 작성 (역할, 제약, 출력 형식 명시)
-- `{{ user_input }}`을 반드시 포함
-- 이전 노드 결과는 `{{ node_outputs['노드id'] }}`로 참조
-- router/condition 분기 후 각 브랜치 노드의 프롬프트는 해당 케이스에 특화되게 작성
-- system_prompt_prefix로 공통 페르소나/지시사항을 정의하면 중복을 줄일 수 있음
+## Jinja2 컨텍스트 변수
+- `{{{{ user_input }}}}` — 사용자 입력 (모든 노드에서 사용 가능)
+- `{{{{ node_outputs['node_id'] }}}}` — 이전 노드의 출력 텍스트
+- `{{{{ variables['output_key'] }}}}` — router/condition 노드가 저장한 분기 결과값
+- `{{{{ is_state('entity_id', 'on') }}}}` — HA 엔티티 상태 확인
+- `{{{{ states('sensor.x') | float }}}}` — HA 센서 값
 
-## 자주 쓰는 패턴
-**단순 에이전트**: input → regular → output
-**의도 분류 후 전문화**: input → router → [전문_에이전트A, 전문_에이전트B] → output
-**병렬 처리 후 합치기**: input → [에이전트A, 에이전트B] (parallel edges) → merge → output
-**HA 상태 기반 분기**: input → condition → [케이스A, 케이스B] → output
+## 엣지 동작 규칙
+- `condition` 없는 엣지 = 항상 실행 (단순 연결 또는 router fallback)
+- `condition`이 있는 엣지 = 해당 변수 값이 일치할 때만 실행
+- 조건 엣지가 하나도 매칭 안 되면 → 조건 없는 엣지(fallback)로 실행
+- `mode: parallel` 엣지들은 동시에 실행됨
 
 ---
 
-# Graph YAML 스키마
+# YAML 스키마
 
 ```yaml
-id: string              # 그래프 고유 ID (기존 그래프라면 반드시 보존)
-name: string            # 그래프 이름
-description: string     # 그래프 설명
-model: string           # 기본 LLM 모델
-model_params:           # 선택사항 - 그래프 전체 기본값
+id: string              # 그래프 고유 ID (기존이면 반드시 보존)
+name: string
+description: string
+model: string           # 기본 모델 (예: gpt-5.4)
+model_params:           # 선택사항
   temperature: 0.0~2.0
-  top_p: 0.0~1.0
   max_tokens: integer
   reasoning_effort: low|medium|high
-system_prompt_prefix: string   # 모든 노드 공통 prefix (페르소나, 공통 지시사항)
-max_tool_iterations: integer   # 기본 10
+system_prompt_prefix: string  # 모든 노드 공통 prefix
 nodes:
-  - id: string          # 영문 snake_case (예: intent_router, lighting_agent)
+  - id: string          # 영문 snake_case
     type: input|router|regular|output|condition|merge
     name: string
-    # 노드별 추가 필드 (아래 참조)
 edges:
   - source: node_id
     target: node_id
-    mode: sequential|parallel   # 기본 sequential. 병렬 실행 시 parallel
-    condition:                  # router/condition 분기 엣지에만 사용
-      variable: string          # router의 output_key 값
-      value: string             # 매칭할 값 (해당 값일 때만 이 엣지 사용)
+    mode: sequential|parallel  # 기본 sequential
+    condition:           # router/condition 분기 엣지에만 사용
+      variable: string   # router의 output_key 값
+      value: string      # 이 값과 일치할 때만 실행
 ```
 
-# 노드 타입별 필드
+# 노드별 추가 필드
 
-**input 노드**: 진입점. 추가 필드 없음.
+**router**: prompt(Jinja2), output_key(변수명), values(선택지 목록)
+**regular**: prompt(Jinja2), skills(스킬 ID 목록), output_schema(구조화 출력), model(선택)
+**output**: output_template(Jinja2, 선택사항)
+**condition**: output_key(변수명), conditions(when/value 목록), default(기본값)
+**merge**: merge_strategy(concat|template|last), separator, merge_template(Jinja2)
 
-**output 노드**:
+---
+
+# 예제 1: 의도 분류 + 전문 에이전트 (가장 일반적인 패턴)
+
 ```yaml
-output_template: |    # 선택사항. Jinja2.
-  최종 답변: {{ node_outputs['last_agent'] }}
+id: GRAPH_ID_HERE
+name: 스마트홈 어시스턴트
+description: 의도를 분류하고 전문 에이전트로 라우팅합니다
+model: gpt-5.4
+system_prompt_prefix: "당신은 스마트홈 어시스턴트입니다. 항상 간결하게 답변하세요."
+nodes:
+  - id: input
+    type: input
+    name: 입력
+  - id: intent_router
+    type: router
+    name: 의도 분류기
+    prompt: |
+      사용자 요청을 카테고리로 분류하세요.
+      - lighting: 조명 켜기/끄기/밝기 조절
+      - climate: 에어컨/난방 제어, 온도 설정
+      - general: 그 외 모든 요청
+      요청: {{{{ user_input }}}}
+    output_key: intent
+    values:
+      - lighting
+      - climate
+      - general
+  - id: lighting_agent
+    type: regular
+    name: 조명 에이전트
+    prompt: |
+      조명을 제어하거나 상태를 알려주세요.
+      요청: {{{{ user_input }}}}
+    skills:
+      - light_control
+  - id: climate_agent
+    type: regular
+    name: 냉난방 에이전트
+    prompt: |
+      냉난방 기기를 제어하거나 온도를 알려주세요.
+      요청: {{{{ user_input }}}}
+    skills:
+      - climate_control
+  - id: general_agent
+    type: regular
+    name: 일반 어시스턴트
+    prompt: |
+      스마트홈 관련 질문에 답변하세요.
+      요청: {{{{ user_input }}}}
+  - id: output
+    type: output
+    name: 출력
+edges:
+  - source: input
+    target: intent_router
+  - source: intent_router
+    target: lighting_agent
+    condition: {{variable: intent, value: lighting}}
+  - source: intent_router
+    target: climate_agent
+    condition: {{variable: intent, value: climate}}
+  - source: intent_router
+    target: general_agent   # 조건 없음 = fallback (lighting/climate 아닐 때)
+  - source: lighting_agent
+    target: output
+  - source: climate_agent
+    target: output
+  - source: general_agent
+    target: output
 ```
 
-**router 노드**: LLM이 라우팅 결정.
+# 예제 2: 병렬 분석 + merge
+
 ```yaml
-prompt: |
-  사용자의 요청을 분석해 적절한 카테고리를 선택하세요.
-  요청: {{ user_input }}
-output_key: route          # 결과 저장 변수명
-values:
-  - category_a
-  - category_b
-  - fallback
+id: GRAPH_ID_HERE
+name: 다각도 분석 어시스턴트
+description: 여러 관점에서 동시에 분석하고 종합합니다
+model: gpt-5.4
+nodes:
+  - id: input
+    type: input
+    name: 입력
+  - id: pros_analyst
+    type: regular
+    name: 장점 분석가
+    prompt: |
+      다음 주제의 장점과 기회를 분석하세요.
+      주제: {{{{ user_input }}}}
+  - id: cons_analyst
+    type: regular
+    name: 단점 분석가
+    prompt: |
+      다음 주제의 단점과 위험 요소를 분석하세요.
+      주제: {{{{ user_input }}}}
+  - id: merge_node
+    type: merge
+    name: 결과 종합
+    merge_strategy: template
+    merge_template: |
+      ## 장점
+      {{{{ node_outputs['pros_analyst'] }}}}
+
+      ## 단점
+      {{{{ node_outputs['cons_analyst'] }}}}
+  - id: output
+    type: output
+    name: 출력
+edges:
+  - source: input
+    target: pros_analyst
+    mode: parallel
+  - source: input
+    target: cons_analyst
+    mode: parallel
+  - source: pros_analyst
+    target: merge_node
+  - source: cons_analyst
+    target: merge_node
+  - source: merge_node
+    target: output
 ```
 
-**regular (agent) 노드**:
-```yaml
-prompt: |
-  당신은 [역할]입니다. [구체적 지시사항]
-  사용자 요청: {{ user_input }}
-  # 이전 노드 결과 참조 예시:
-  # 분류 결과: {{ variables['router_node.route'] }}
-  # 이전 답변: {{ node_outputs['prev_agent'] }}
-model: string         # 선택사항. 이 노드만 다른 모델 사용
-skills:               # 스킬 ID 목록 (HA 서비스 호출 등)
-  - skill_id
-output_schema:        # 선택사항. JSON 구조화 출력 시 사용
-  - key: field_name
-    type: string|number|integer|boolean
-    description: 필드 설명
-```
+# 예제 3: HA 상태 기반 분기 (condition)
 
-**condition 노드**: Jinja2로 분기 (LLM 없음, 빠름)
 ```yaml
-output_key: status
-conditions:
-  - when: "{{{{ is_state('light.living_room', 'on') }}}}"
-    value: "on"
-  - when: "{{{{ states('sensor.temperature') | float > 25 }}}}"
-    value: "hot"
-default: "normal"
-```
-
-**merge 노드**: 병렬 브랜치 합치기 (LLM 없음)
-```yaml
-merge_strategy: concat|template|last
-separator: "\\n\\n---\\n\\n"
-merge_template: |       # template 전략일 때
-  ## 결과 A
-  {{{{ node_outputs['agent_a'] }}}}
-  ## 결과 B
-  {{{{ node_outputs['agent_b'] }}}}
+id: GRAPH_ID_HERE
+name: 상황별 스마트홈 에이전트
+description: 현재 HA 상태(시간대/외출 여부)에 따라 다르게 동작합니다
+model: gpt-5.4
+nodes:
+  - id: input
+    type: input
+    name: 입력
+  - id: mode_check
+    type: condition
+    name: 모드 확인
+    output_key: mode
+    conditions:
+      - when: "{{{{ is_state('input_boolean.away_mode', 'on') }}}}"
+        value: away
+      - when: "{{{{ now().hour >= 23 or now().hour < 7 }}}}"
+        value: night
+    default: home
+  - id: away_agent
+    type: regular
+    name: 외출 모드 에이전트
+    prompt: |
+      외출 모드입니다. 보안·에너지 절약 중심으로 답변하세요.
+      요청: {{{{ user_input }}}}
+  - id: night_agent
+    type: regular
+    name: 야간 모드 에이전트
+    prompt: |
+      야간 시간입니다. 수면을 방해하지 않도록 조용한 제안을 해주세요.
+      요청: {{{{ user_input }}}}
+  - id: home_agent
+    type: regular
+    name: 일반 모드 에이전트
+    prompt: |
+      스마트홈 요청을 처리해주세요.
+      요청: {{{{ user_input }}}}
+  - id: output
+    type: output
+    name: 출력
+edges:
+  - source: input
+    target: mode_check
+  - source: mode_check
+    target: away_agent
+    condition: {{variable: mode, value: away}}
+  - source: mode_check
+    target: night_agent
+    condition: {{variable: mode, value: night}}
+  - source: mode_check
+    target: home_agent
+    condition: {{variable: mode, value: home}}
+  - source: away_agent
+    target: output
+  - source: night_agent
+    target: output
+  - source: home_agent
+    target: output
 ```
 
 현재 그래프 ID: {graph_id}
@@ -628,61 +748,227 @@ merge_template: |       # template 전략일 때
 
 대상 노드: id={node_id}, type={node_type}, name={node_name}
 
-**규칙:**
-- id와 type 필드는 절대 변경하지 마세요.
-- 노드 단독 YAML만 반환하세요 (전체 그래프 아님).
+**규칙:** id와 type 필드는 절대 변경하지 마세요. 노드 단독 YAML만 반환하세요.
 
 **Jinja2 컨텍스트 변수:**
-- `{{ user_input }}` — 사용자 입력
-- `{{ node_outputs['node_id'] }}` — 다른 노드의 출력
-- `{{ variables['node_id.output_key'] }}` — router/condition 노드의 분기 결과
+- `{{{{ user_input }}}}` — 사용자 입력
+- `{{{{ node_outputs['node_id'] }}}}` — 다른 노드의 출력
+- `{{{{ variables['output_key'] }}}}` — router/condition 노드의 분기 결과
 
-**노드 타입별 핵심 필드:**
-- **router**: output_key(변수명), values(선택지 목록), prompt(역할과 선택지 설명 포함)
-- **regular**: prompt(구체적 역할/지시), skills(ID 목록), output_schema(구조화 출력), model(선택)
-- **output**: output_template(최종 출력 포맷, Jinja2)
-- **input**: 추가 필드 없음
-- **condition**: output_key(변수명), conditions(when/value 목록), default(기본값)
-- **merge**: merge_strategy(concat|template|last), separator, merge_template
+---
+
+# 노드 타입별 예제
+
+**router 노드 예제:**
+```yaml
+id: {node_id if node_type == "router" else "intent_router"}
+type: router
+name: 의도 분류기
+prompt: |
+  사용자 요청의 카테고리를 분류하세요.
+  - smart_home: 기기 제어 (조명, 에어컨, 스위치 등)
+  - query: 상태 조회, 정보 질문
+  - automation: 자동화 규칙 설정
+  요청: {{{{ user_input }}}}
+output_key: intent
+values:
+  - smart_home
+  - query
+  - automation
+```
+
+**regular 노드 예제:**
+```yaml
+id: {node_id if node_type == "regular" else "assistant_agent"}
+type: regular
+name: 어시스턴트
+prompt: |
+  당신은 스마트홈 전문가입니다.
+  분류 결과: {{{{ variables['intent'] }}}}
+  요청: {{{{ user_input }}}}
+  이전 분석: {{{{ node_outputs.get('analyzer', '') }}}}
+skills:
+  - light_control
+  - climate_control
+output_schema:
+  - key: action
+    type: string
+    description: 수행한 작업 설명
+  - key: success
+    type: boolean
+    description: 처리 성공 여부
+```
+
+**condition 노드 예제:**
+```yaml
+id: {node_id if node_type == "condition" else "time_check"}
+type: condition
+name: 시간대 확인
+output_key: time_period
+conditions:
+  - when: "{{{{ now().hour >= 6 and now().hour < 12 }}}}"
+    value: morning
+  - when: "{{{{ now().hour >= 18 and now().hour < 22 }}}}"
+    value: evening
+  - when: "{{{{ is_state('input_boolean.away_mode', 'on') }}}}"
+    value: away
+default: daytime
+```
+
+**merge 노드 예제:**
+```yaml
+id: {node_id if node_type == "merge" else "result_merger"}
+type: merge
+name: 결과 종합
+merge_strategy: template
+merge_template: |
+  ## 분석 결과 종합
+
+  ### 주요 내용
+  {{{{ node_outputs['main_agent'] }}}}
+
+  ### 보조 분석
+  {{{{ node_outputs['sub_agent'] }}}}
+```
+
+**output 노드 예제:**
+```yaml
+id: {node_id if node_type == "output" else "output"}
+type: output
+name: 출력
+output_template: |
+  처리 결과: {{{{ node_outputs['last_agent'] }}}}
+```
 
 노드 YAML만 반환하세요."""
 
     if scope == "skill":
         skill_id = context.get("skill_id", "")
         skill_name = context.get("skill_name", "")
-        return base + f"""# Skill YAML 스키마
+        return base + f"""# Skill YAML
 
-스킬은 AI 에이전트 노드가 도구(tool)로 호출할 수 있는 함수 집합입니다.
+스킬은 regular 노드가 LLM 도구(tool)로 호출하는 함수 집합입니다.
 
 **설계 원칙:**
-- spec.description은 LLM이 언제 이 함수를 써야 하는지 명확히 설명
-- 파라미터는 LLM이 추론할 수 있는 수준으로 정의
-- native 타입: HA 서비스 직접 호출 (조명, 스위치, 알림 등)
-- template 타입: HA 상태 조회 및 간단한 연산
-- web 타입: 외부 API 호출
+- `spec.description`: LLM이 언제·어떻게 쓸지 명확히 기술
+- 파라미터: LLM이 자연어에서 추론할 수 있는 수준으로 정의
+- `native`: HA 서비스 직접 호출 (조명·스위치·알림 등)
+- `template`: HA 상태 조회 및 연산
+- `web`: 외부 API 호출
+
+---
+
+# 예제 1: native — HA 서비스 호출 (조명 제어)
 
 ```yaml
-id: string        # 스킬 고유 ID (기존이면 반드시 보존)
-name: string
-group: string     # 선택사항. 그룹핑
-description: string
+id: light_control
+name: 조명 제어
+group: home_control
+description: 조명 켜기/끄기/밝기 조절
 functions:
   - spec:
-      name: function_name   # 영문 snake_case
-      description: "LLM에게 제공할 함수 설명 - 언제 어떻게 쓰는지 명확히"
+      name: turn_on_light
+      description: 지정한 조명을 켭니다. 밝기를 선택적으로 설정할 수 있습니다.
       parameters:
         type: object
         properties:
-          param_name:
-            type: string|integer|number|boolean
-            description: 파라미터 설명
-            enum: [선택1, 선택2]   # 선택사항
-        required: [필수파라미터명]
+          entity_id:
+            type: string
+            description: 조명 엔티티 ID (예: light.living_room, light.bedroom)
+          brightness_pct:
+            type: integer
+            description: 밝기 퍼센트 (0-100). 생략하면 100%
+        required:
+          - entity_id
     function:
-      type: native|template|web
-      # native   → service: "domain.service", data: {{param: "{{{{ param }}}}"}}
-      # template → value_template: "{{{{ states('sensor.x') }}}}"
-      # web      → url: "https://...", method: GET|POST, headers: {{}}
+      type: native
+      service: light.turn_on
+      data:
+        entity_id: "{{{{ entity_id }}}}"
+        brightness_pct: "{{{{ brightness_pct | default(100) }}}}"
+  - spec:
+      name: turn_off_light
+      description: 지정한 조명을 끕니다.
+      parameters:
+        type: object
+        properties:
+          entity_id:
+            type: string
+            description: 조명 엔티티 ID
+        required:
+          - entity_id
+    function:
+      type: native
+      service: light.turn_off
+      data:
+        entity_id: "{{{{ entity_id }}}}"
+```
+
+# 예제 2: template — HA 상태 조회
+
+```yaml
+id: sensor_query
+name: 센서 조회
+group: home_monitor
+description: HA 센서의 현재 상태 조회
+functions:
+  - spec:
+      name: get_sensor_state
+      description: 특정 센서의 현재 값을 조회합니다. 온도·습도·전력 등 모든 센서에 사용 가능합니다.
+      parameters:
+        type: object
+        properties:
+          entity_id:
+            type: string
+            description: 조회할 센서 엔티티 ID (예: sensor.living_room_temperature)
+        required:
+          - entity_id
+    function:
+      type: template
+      value_template: "{{{{ states(entity_id) }}}} {{{{ state_attr(entity_id, 'unit_of_measurement') or '' }}}}"
+  - spec:
+      name: get_entity_state
+      description: 임의의 HA 엔티티 상태와 주요 속성을 조회합니다.
+      parameters:
+        type: object
+        properties:
+          entity_id:
+            type: string
+            description: 엔티티 ID (예: light.living_room, switch.fan, climate.ac)
+        required:
+          - entity_id
+    function:
+      type: template
+      value_template: >
+        {{{{ entity_id }}}}: state={{{{ states(entity_id) }}}},
+        friendly_name={{{{ state_attr(entity_id, 'friendly_name') }}}}
+```
+
+# 예제 3: web — 외부 API 호출
+
+```yaml
+id: weather_api
+name: 날씨 조회
+group: external
+description: 외부 날씨 API에서 현재 날씨 정보를 가져옵니다
+functions:
+  - spec:
+      name: get_weather
+      description: 특정 도시의 현재 날씨 정보를 조회합니다.
+      parameters:
+        type: object
+        properties:
+          city:
+            type: string
+            description: 도시 이름 (예: Seoul, Busan)
+        required:
+          - city
+    function:
+      type: web
+      url: "https://wttr.in/{{{{ city }}}}?format=j1"
+      method: GET
+      headers:
+        Accept: application/json
 ```
 
 현재 스킬: id={skill_id}, name={skill_name}
