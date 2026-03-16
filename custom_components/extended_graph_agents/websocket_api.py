@@ -411,9 +411,18 @@ async def _handle_auto_generate(
     history = msg.get("messages", [])[-10:]
     messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
     messages.extend(history)
+
+    # 이전에 생성된 결과가 있으면 수정 컨텍스트로 제공
+    current_yaml = msg.get("current_yaml", "").strip()
+    current_context = (
+        f"\n현재 그래프 (수정 요청 시 이 내용을 기반으로 개선하세요):\n```yaml\n{current_yaml}\n```\n\n"
+        if current_yaml else ""
+    )
+
     messages.append({
         "role": "user",
         "content": (
+            f"{current_context}"
             f"요청: {msg['request']}\n\n"
             '반드시 이 JSON 구조로만 응답하세요:\n'
             '{"skills": [{"id": "...", "name": "...", "yaml": "..."}], '

@@ -62,6 +62,8 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Auto 모드: 마지막 생성된 graph YAML (재생성 시 수정 컨텍스트로 전달)
+  const [lastAutoGraphYaml, setLastAutoGraphYaml] = useState<string>("");
   const [includeHaContext, setIncludeHaContext] = useState(false);
   const [aiModel, setAiModel] = useState<string>(() => {
     try { return localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_AI_MODEL; } catch { return DEFAULT_AI_MODEL; }
@@ -124,26 +126,46 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
 
     const apiHistory: AiAssistMessage[] = messages
       .slice(-10)
-      .map((m) => ({
-        role: m.role,
-        content: m.role === "assistant" && m.yaml
-          ? `${m.content}\n\n생성된 YAML:\n${m.yaml}`
-          : m.content,
-      }));
+      .map((m) => {
+        if (m.role === "assistant" && m.skills !== undefined) {
+          // Auto 결과: skills + graph를 히스토리에 포함해서 AI가 수정 맥락 파악 가능
+          const skillsText = (m.skills ?? [])
+            .map(s => `### Skill: ${s.name} (id: ${s.id})\n\`\`\`yaml\n${s.yaml}\n\`\`\``)
+            .join("\n\n");
+          const graphText = m.graphYaml
+            ? `### Graph\n\`\`\`yaml\n${m.graphYaml}\n\`\`\``
+            : "";
+          return {
+            role: m.role as "user" | "assistant",
+            content: `${m.content}\n\n이전에 생성된 내용:\n${skillsText}\n\n${graphText}`,
+          };
+        }
+        return {
+          role: m.role as "user" | "assistant",
+          content: m.role === "assistant" && m.yaml
+            ? `${m.content}\n\n생성된 YAML:\n${m.yaml}`
+            : m.content,
+        };
+      });
+
+    // Auto 모드의 current_yaml: 이전에 생성된 graph YAML (수정 컨텍스트)
+    const currentYaml = scope === "auto" ? lastAutoGraphYaml : getCurrentYaml(scope);
 
     try {
       const result = await aiAssist(
-        conn, scope, trimmed, getCurrentYaml(scope), apiHistory, getContext(scope),
+        conn, scope, trimmed, currentYaml, apiHistory, getContext(scope),
         { include_ha_context: scope === "auto" ? true : includeHaContext, language, model: aiModel }
       );
 
       if (scope === "auto" && result.skills !== undefined) {
+        const newGraphYaml = result.graph?.yaml ?? "";
+        setLastAutoGraphYaml(newGraphYaml);
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           role: "assistant",
           content: result.explanation,
           skills: result.skills,
-          graphYaml: result.graph?.yaml,
+          graphYaml: newGraphYaml,
         }]);
       } else {
         setMessages((prev) => [...prev, {
@@ -708,6 +730,19 @@ function AutoResultBubble({ msg, onApplySkill, onApplyGraph, onApplyAll, onCopy,
           {allApplied ? "✓ 전체 적용 완료" : applyingAll ? "적용 중..." : "⚡ 전체 적용 (Skills 저장 + Graph 적용)"}
         </button>
       )}
+
+      {/* 피드백 힌트 */}
+      <div style={{
+        background: "#0f172a",
+        border: "1px solid #1e293b",
+        borderRadius: 6,
+        padding: "6px 10px",
+        color: "#475569",
+        fontSize: 10,
+        textAlign: "center",
+      }}>
+        💬 수정 사항을 아래에 입력하면 결과를 개선해서 재생성합니다
+      </div>
     </div>
   );
 }
