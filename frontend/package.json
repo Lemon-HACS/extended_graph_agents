@@ -1,6 +1,6 @@
 {
   "name": "extended-graph-agents-frontend",
-  "version": "1.0.39",
+  "version": "1.0.61",
   "private": true,
   "scripts": {
     "dev": "vite",
