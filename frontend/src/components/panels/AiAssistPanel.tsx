@@ -158,7 +158,19 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
       );
 
       if (scope === "auto" && result.skills !== undefined) {
-        const newGraphYaml = result.graph?.yaml ?? "";
+        console.log("[AI Auto] 응답 수신:", {
+          explanation: result.explanation,
+          skillCount: result.skills?.length,
+          graphYamlType: typeof result.graph?.yaml,
+          graphYamlPreview: typeof result.graph?.yaml === "string"
+            ? result.graph.yaml.slice(0, 120)
+            : result.graph?.yaml,
+        });
+        const rawYaml = result.graph?.yaml;
+        if (typeof rawYaml !== "string") {
+          console.error("[AI Auto] graph.yaml이 문자열이 아님:", rawYaml);
+        }
+        const newGraphYaml = typeof rawYaml === "string" ? rawYaml : "";
         setLastAutoGraphYaml(newGraphYaml);
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),

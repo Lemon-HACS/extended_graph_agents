@@ -313,32 +313,44 @@ async def ws_ai_assist(
         ),
     })
 
-    try:
-        response = await client.chat.completions.create(
-            model=ai_model,
-            messages=messages,
-            response_format={"type": "json_object"},
-            max_tokens=6000,
-            temperature=0.3,
-        )
-        parsed = json.loads(response.choices[0].message.content)
-
-        generated_yaml = parsed.get("yaml", "")
+    for attempt in range(2):
         try:
+            response = await client.chat.completions.create(
+                model=ai_model,
+                messages=messages,
+                response_format={"type": "json_object"},
+                max_tokens=6000,
+                temperature=0.3,
+            )
+            parsed = json.loads(response.choices[0].message.content)
+
+            generated_yaml = parsed.get("yaml", "")
+            if not isinstance(generated_yaml, str):
+                _LOGGER.warning("AI assist: yaml이 문자열이 아님 (%s) — YAML로 직렬화 시도", type(generated_yaml))
+                generated_yaml = pyyaml.dump(generated_yaml, allow_unicode=True, default_flow_style=False)
+
             pyyaml.safe_load(generated_yaml)
-        except pyyaml.YAMLError as yaml_err:
-            connection.send_error(msg["id"], "invalid_yaml", f"LLM이 유효하지 않은 YAML을 생성했습니다: {yaml_err}")
+
+            connection.send_result(msg["id"], {
+                "yaml": generated_yaml,
+                "explanation": parsed.get("explanation", ""),
+            })
             return
 
-        connection.send_result(msg["id"], {
-            "yaml": generated_yaml,
-            "explanation": parsed.get("explanation", ""),
-        })
-    except json.JSONDecodeError as err:
-        connection.send_error(msg["id"], "parse_error", f"LLM 응답 파싱 실패: {err}")
-    except Exception as err:
-        _LOGGER.exception("AI assist error")
-        connection.send_error(msg["id"], "ai_error", str(err))
+        except json.JSONDecodeError as err:
+            if attempt == 0:
+                _LOGGER.warning("AI assist: JSON 파싱 실패, 재시도 중: %s", err)
+                continue
+            connection.send_error(msg["id"], "parse_error", f"LLM 응답 파싱 실패: {err}")
+        except pyyaml.YAMLError as yaml_err:
+            if attempt == 0:
+                _LOGGER.warning("AI assist: YAML 오류, 재시도 중: %s", yaml_err)
+                continue
+            connection.send_error(msg["id"], "invalid_yaml", f"LLM이 유효하지 않은 YAML을 생성했습니다: {yaml_err}")
+        except Exception as err:
+            _LOGGER.exception("AI assist error")
+            connection.send_error(msg["id"], "ai_error", str(err))
+            return
 
 
 def _build_ha_context_section(hass: HomeAssistant) -> str:
@@ -430,51 +442,65 @@ async def _handle_auto_generate(
         ),
     })
 
-    try:
-        response = await client.chat.completions.create(
-            model=ai_model,
-            messages=messages,
-            response_format={"type": "json_object"},
-            max_tokens=8000,
-            temperature=0.3,
-        )
-        parsed = json.loads(response.choices[0].message.content)
-
-        # 스킬 YAML 검증
-        raw_skills = parsed.get("skills", [])
-        validated_skills = []
-        for skill_item in raw_skills:
-            skill_yaml = skill_item.get("yaml", "")
-            try:
-                pyyaml.safe_load(skill_yaml)
-                validated_skills.append({
-                    "id": skill_item.get("id", ""),
-                    "name": skill_item.get("name", ""),
-                    "yaml": skill_yaml,
-                })
-            except pyyaml.YAMLError as e:
-                _LOGGER.warning("Auto generate: skill YAML 무효 (%s): %s", skill_item.get("id"), e)
-
-        # 그래프 YAML 검증
-        graph_data = parsed.get("graph", {})
-        graph_yaml = graph_data.get("yaml", "")
+    for attempt in range(2):
         try:
+            response = await client.chat.completions.create(
+                model=ai_model,
+                messages=messages,
+                response_format={"type": "json_object"},
+                max_tokens=8000,
+                temperature=0.3,
+            )
+            parsed = json.loads(response.choices[0].message.content)
+
+            # 스킬 YAML 검증
+            raw_skills = parsed.get("skills", [])
+            validated_skills = []
+            for skill_item in raw_skills:
+                skill_yaml = skill_item.get("yaml", "")
+                if not isinstance(skill_yaml, str):
+                    _LOGGER.warning("Auto generate: skill.yaml이 문자열이 아님 (%s) — YAML로 직렬화 시도", type(skill_yaml))
+                    skill_yaml = pyyaml.dump(skill_yaml, allow_unicode=True, default_flow_style=False)
+                try:
+                    pyyaml.safe_load(skill_yaml)
+                    validated_skills.append({
+                        "id": skill_item.get("id", ""),
+                        "name": skill_item.get("name", ""),
+                        "yaml": skill_yaml,
+                    })
+                except pyyaml.YAMLError as e:
+                    _LOGGER.warning("Auto generate: skill YAML 무효 (%s): %s", skill_item.get("id"), e)
+
+            # 그래프 YAML 검증
+            graph_data = parsed.get("graph", {})
+            graph_yaml = graph_data.get("yaml", "")
+            if not isinstance(graph_yaml, str):
+                _LOGGER.warning("Auto generate: graph.yaml이 문자열이 아님 (%s) — YAML로 직렬화 시도", type(graph_yaml))
+                graph_yaml = pyyaml.dump(graph_yaml, allow_unicode=True, default_flow_style=False)
+
             pyyaml.safe_load(graph_yaml)
-        except pyyaml.YAMLError as yaml_err:
-            connection.send_error(msg["id"], "invalid_yaml", f"그래프 YAML 오류: {yaml_err}")
+
+            connection.send_result(msg["id"], {
+                "skills": validated_skills,
+                "graph": {"yaml": graph_yaml},
+                "explanation": parsed.get("explanation", ""),
+            })
             return
 
-        connection.send_result(msg["id"], {
-            "skills": validated_skills,
-            "graph": {"yaml": graph_yaml},
-            "explanation": parsed.get("explanation", ""),
-        })
-
-    except json.JSONDecodeError as err:
-        connection.send_error(msg["id"], "parse_error", f"LLM 응답 파싱 실패: {err}")
-    except Exception as err:
-        _LOGGER.exception("Auto generate error")
-        connection.send_error(msg["id"], "ai_error", str(err))
+        except json.JSONDecodeError as err:
+            if attempt == 0:
+                _LOGGER.warning("Auto generate: JSON 파싱 실패, 재시도 중: %s", err)
+                continue
+            connection.send_error(msg["id"], "parse_error", f"LLM 응답 파싱 실패: {err}")
+        except pyyaml.YAMLError as yaml_err:
+            if attempt == 0:
+                _LOGGER.warning("Auto generate: YAML 오류, 재시도 중: %s", yaml_err)
+                continue
+            connection.send_error(msg["id"], "invalid_yaml", f"그래프 YAML 오류: {yaml_err}")
+        except Exception as err:
+            _LOGGER.exception("Auto generate error")
+            connection.send_error(msg["id"], "ai_error", str(err))
+            return
 
 
 @websocket_api.require_admin
