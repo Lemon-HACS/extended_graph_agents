@@ -435,6 +435,12 @@ tools:
 3. 도구의 params에 description을 상세히 작성 (LLM이 인자를 정확히 추출하도록)
 4. entity_id description에 실제 사용 가능한 엔티티 예시를 포함
 5. 모든 agent 노드의 prompt에 역할과 제약을 구체적으로 작성
+6. **서비스와 엔티티 도메인을 반드시 일치시키세요!**
+   - switch.* 엔티티 → switch.turn_on / switch.turn_off
+   - light.* 엔티티 → light.turn_on / light.turn_off
+   - climate.* 엔티티 → climate.set_temperature 등
+   - 도메인이 섞일 수 있으면 homeassistant.turn_on / homeassistant.turn_off 사용 (모든 도메인에 작동)
+7. 엔티티 목록을 보고 실제 존재하는 entity_id를 사용하세요. 추측하지 마세요.
 
 # 출력 형식
 반드시 JSON으로 응답:

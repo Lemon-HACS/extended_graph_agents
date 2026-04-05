@@ -557,10 +557,11 @@ class EngineV2:
         except Exception as err:
             return f"Tool error: {err}"
 
+    # 도메인 무관하게 작동하는 범용 서비스 목록
+    _GENERIC_SERVICES = {"turn_on", "turn_off", "toggle"}
+
     async def _execute_native_tool(self, tool: ToolDef, args: dict[str, Any]) -> str:
         """Execute a native HA service call."""
-        from homeassistant.helpers import template as tmpl
-
         service = tool.service
         if not service:
             return "No service specified"
@@ -571,13 +572,26 @@ class EngineV2:
 
         domain, service_name = parts
 
-        # Render data template with args
         data = {}
         for key, value in args.items():
             data[key] = value
 
+        # 엔티티 도메인과 서비스 도메인 불일치 자동 보정
+        # 예: light.turn_off + switch.xxx → switch.turn_off 또는 homeassistant.turn_off
+        entity_id = data.get("entity_id", "")
+        if entity_id and "." in entity_id and service_name in self._GENERIC_SERVICES:
+            entity_domain = entity_id.split(".", 1)[0]
+            if entity_domain != domain:
+                _LOGGER.info(
+                    "Service domain mismatch: %s.%s called with %s — "
+                    "remapping to homeassistant.%s",
+                    domain, service_name, entity_id, service_name,
+                )
+                domain = "homeassistant"
+
+        actual_service = f"{domain}.{service_name}"
         await self.hass.services.async_call(domain, service_name, data, blocking=True)
-        return f"Service {service} called successfully with {json.dumps(data, ensure_ascii=False)}"
+        return f"Service {actual_service} called successfully with {json.dumps(data, ensure_ascii=False)}"
 
     async def _execute_template_tool(self, tool: ToolDef, args: dict[str, Any]) -> str:
         """Execute a Jinja2 template tool."""
