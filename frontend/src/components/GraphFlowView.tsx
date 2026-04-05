@@ -20,6 +20,8 @@ import type { GraphV2, NodeDefV2, EdgeV2 } from "../types_v2";
 interface GraphFlowViewProps {
   graph: GraphV2;
   height?: number | string;
+  /** 변경된 노드 ID 목록 — 하이라이트 표시 */
+  changedNodes?: Set<string>;
 }
 
 // ── Node type colors ──
@@ -46,11 +48,17 @@ interface GraphNodeData {
   conditions?: Array<{ when: string; value: string }>;
   condDefault?: string;
   model?: string;
+  changed?: boolean;
 }
 
 function GraphNode({ data }: { data: GraphNodeData }) {
   const colors = NODE_COLORS[data.type] || NODE_COLORS.agent;
   const isTerminal = data.type === "START" || data.type === "END";
+
+  const changedStyle = data.changed ? {
+    boxShadow: `0 0 12px 3px #f59e0b88`,
+    border: `2px solid #f59e0b`,
+  } : {};
 
   if (isTerminal) {
     return (
@@ -63,6 +71,7 @@ function GraphNode({ data }: { data: GraphNodeData }) {
           padding: "6px 20px",
           minWidth: 60,
           textAlign: "center",
+          ...changedStyle,
         }}>
           <div style={{ fontSize: "11px", fontWeight: 600, color: "#e2e8f0" }}>
             {data.label}
@@ -84,6 +93,7 @@ function GraphNode({ data }: { data: GraphNodeData }) {
         minWidth: 160,
         maxWidth: 260,
         fontSize: "11px",
+        ...changedStyle,
       }}>
         {/* Header: type badge + name */}
         <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
@@ -329,7 +339,7 @@ function autoLayout(
 
 // ── Main component ──
 
-export function GraphFlowView({ graph, height = "100%" }: GraphFlowViewProps) {
+export function GraphFlowView({ graph, height = "100%", changedNodes }: GraphFlowViewProps) {
   const { flowNodes, flowEdges } = useMemo(() => {
     const graphNodeNames = Object.keys(graph.nodes);
     const parsedEdges = parseEdges(graph.edges);
@@ -365,6 +375,7 @@ export function GraphFlowView({ graph, height = "100%" }: GraphFlowViewProps) {
           conditions: nodeDef?.conditions,
           condDefault: nodeDef?.default,
           model: nodeDef?.model,
+          changed: changedNodes?.has(name) || false,
         } satisfies GraphNodeData,
         draggable: false,
         selectable: false,
@@ -392,7 +403,7 @@ export function GraphFlowView({ graph, height = "100%" }: GraphFlowViewProps) {
       }));
 
     return { flowNodes, flowEdges };
-  }, [graph]);
+  }, [graph, changedNodes]);
 
   return (
     <div style={{ height, width: "100%", background: "#0a0f1e", borderRadius: "6px" }}>

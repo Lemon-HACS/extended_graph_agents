@@ -456,7 +456,7 @@ graph 객체는 다음 필드를 포함:
 {{
   "graph": {{
     "name": "스마트홈 에이전트",
-    "model": "gpt-4o",
+    "model": "gpt-5.4",
     "nodes": {{
       "classify": {{
         "type": "router",

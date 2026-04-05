@@ -266,7 +266,7 @@ export function ChatPanel({ conn, language }: ChatPanelProps) {
       <div style={styles.settingsBar}>
         <div style={styles.settingsRow}>
           <label style={styles.settingLabel}>
-            모델:
+            AI 모델:
             <ModelComboBox
               value={model}
               onChange={(v) => updateModelSettings({ model: v })}

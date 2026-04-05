@@ -48,7 +48,7 @@ class EngineV2:
         self,
         hass: Any,          # HomeAssistant
         client: Any,        # OpenAI AsyncClient
-        default_model: str = "gpt-4o",
+        default_model: str = "gpt-5.4",
         event_callback: Callable[[ExecutionEvent], None] | None = None,
         dry_run: bool = False,
     ):

@@ -428,6 +428,44 @@ function GraphDetailView({
 
 // ── AI Modify Panel ──
 
+/** 두 그래프를 비교해서 변경된 노드 ID Set 반환 */
+function diffGraphNodes(oldGraph: GraphV2, newGraph: GraphV2): Set<string> {
+  const changed = new Set<string>();
+  const oldNodes = oldGraph.nodes || {};
+  const newNodes = newGraph.nodes || {};
+
+  // 추가되거나 변경된 노드
+  for (const [id, node] of Object.entries(newNodes)) {
+    if (!oldNodes[id] || JSON.stringify(oldNodes[id]) !== JSON.stringify(node)) {
+      changed.add(id);
+    }
+  }
+  // 삭제된 노드 (표시용)
+  for (const id of Object.keys(oldNodes)) {
+    if (!newNodes[id]) changed.add(id);
+  }
+  return changed;
+}
+
+/** 변경 요약 텍스트 생성 */
+function describeDiff(oldGraph: GraphV2, newGraph: GraphV2): string {
+  const oldNodes = Object.keys(oldGraph.nodes || {});
+  const newNodes = Object.keys(newGraph.nodes || {});
+  const added = newNodes.filter((n) => !oldNodes.includes(n));
+  const removed = oldNodes.filter((n) => !newNodes.includes(n));
+  const modified = newNodes.filter(
+    (n) => oldNodes.includes(n) && JSON.stringify(oldGraph.nodes[n]) !== JSON.stringify(newGraph.nodes[n])
+  );
+
+  const parts: string[] = [];
+  if (added.length > 0) parts.push(`추가: ${added.join(", ")}`);
+  if (removed.length > 0) parts.push(`삭제: ${removed.join(", ")}`);
+  if (modified.length > 0) parts.push(`수정: ${modified.join(", ")}`);
+  if (oldGraph.model !== newGraph.model) parts.push(`모델: ${oldGraph.model} → ${newGraph.model}`);
+  if (parts.length === 0) return "변경사항 없음";
+  return parts.join(" · ");
+}
+
 function AiModifyPanel({
   conn, language, graph, onGraphUpdated,
 }: {
@@ -436,9 +474,11 @@ function AiModifyPanel({
   graph: GraphV2;
   onGraphUpdated: (graph: GraphV2) => void;
 }) {
-  const [messages, setMessages] = useState<Array<{ role: string; content: string; graph?: GraphV2 }>>([]);
+  const [messages, setMessages] = useState<Array<{ role: string; content: string; graph?: GraphV2; changedNodes?: Set<string>; diffSummary?: string }>>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [previewGraph, setPreviewGraph] = useState<GraphV2 | null>(null);
+  const [previewChanged, setPreviewChanged] = useState<Set<string>>(new Set());
   const endRef = useRef<HTMLDivElement>(null);
   const aiModel = loadModelSettings().model;
 
@@ -450,6 +490,7 @@ function AiModifyPanel({
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setLoading(true);
+    setPreviewGraph(null);
 
     try {
       const chatHistory = messages
@@ -465,10 +506,21 @@ function AiModifyPanel({
         model: aiModel,
       });
 
+      const changedNodes = result.graph ? diffGraphNodes(graph, result.graph) : new Set<string>();
+      const diffSummary = result.graph ? describeDiff(graph, result.graph) : "";
+
+      // 프리뷰에 자동 표시
+      if (result.graph) {
+        setPreviewGraph(result.graph);
+        setPreviewChanged(changedNodes);
+      }
+
       setMessages((prev) => [...prev, {
         role: "assistant",
         content: result.explanation,
         graph: result.graph,
+        changedNodes,
+        diffSummary,
       }]);
     } catch (err: any) {
       setMessages((prev) => [...prev, {
@@ -486,14 +538,41 @@ function AiModifyPanel({
       const result = await saveGraphV2(conn, newGraph);
       const updated = await getGraphV2(conn, result.id);
       onGraphUpdated(updated);
+      setPreviewGraph(null);
+      setPreviewChanged(new Set());
       setMessages((prev) => [...prev, { role: "system", content: "✅ 그래프가 업데이트되었습니다." }]);
     } catch (err: any) {
       setMessages((prev) => [...prev, { role: "system", content: `❌ 저장 실패: ${err.message || err}` }]);
     }
   };
 
+  const handleShowPreview = (msg: typeof messages[0]) => {
+    if (msg.graph) {
+      setPreviewGraph(msg.graph);
+      setPreviewChanged(msg.changedNodes || new Set());
+    }
+  };
+
   return (
     <div style={S.aiContainer}>
+      {/* 프리뷰 영역 */}
+      {previewGraph && (
+        <div style={S.aiPreview}>
+          <div style={S.aiPreviewHeader}>
+            <span style={{ fontSize: "11px", fontWeight: 600, color: "#f59e0b" }}>변경 프리뷰</span>
+            <span style={{ fontSize: "10px", color: "#94a3b8" }}>
+              {describeDiff(graph, previewGraph)}
+            </span>
+            <button style={{ ...S.miniBtn, color: "#64748b", marginLeft: "auto" }} onClick={() => { setPreviewGraph(null); setPreviewChanged(new Set()); }}>
+              ✕
+            </button>
+          </div>
+          <div style={{ height: "180px" }}>
+            <GraphFlowView graph={previewGraph} changedNodes={previewChanged} />
+          </div>
+        </div>
+      )}
+
       <div style={S.aiMessages}>
         <div style={S.aiHint}>
           현재 그래프를 기반으로 AI에게 수정을 요청하세요.
@@ -511,10 +590,20 @@ function AiModifyPanel({
             textAlign: msg.role === "system" ? "center" : undefined,
           }}>
             {msg.content}
+            {msg.diffSummary && (
+              <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "4px", padding: "3px 6px", background: "#f59e0b15", borderRadius: "4px" }}>
+                {msg.diffSummary}
+              </div>
+            )}
             {msg.graph && (
-              <button style={S.applyBtn} onClick={() => handleApply(msg.graph!)}>
-                <Save size={12} /> 이 수정사항 적용
-              </button>
+              <div style={{ display: "flex", gap: "4px", marginTop: "6px" }}>
+                <button style={S.applyBtn} onClick={() => handleApply(msg.graph!)}>
+                  <Save size={12} /> 적용
+                </button>
+                <button style={{ ...S.applyBtn, background: "none", borderColor: "#334155", color: "#94a3b8" }} onClick={() => handleShowPreview(msg)}>
+                  프리뷰
+                </button>
+              </div>
             )}
           </div>
         ))}
@@ -747,6 +836,13 @@ const S: Record<string, React.CSSProperties> = {
   // AI
   aiContainer: {
     flex: 1, display: "flex", flexDirection: "column", overflow: "hidden",
+  },
+  aiPreview: {
+    borderBottom: "1px solid #1e293b", flexShrink: 0, overflow: "hidden",
+  },
+  aiPreviewHeader: {
+    display: "flex", alignItems: "center", gap: "8px",
+    padding: "4px 8px", background: "#0f172a", borderBottom: "1px solid #1e293b",
   },
   aiMessages: {
     flex: 1, overflowY: "auto", padding: "12px 16px",

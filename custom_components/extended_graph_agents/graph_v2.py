@@ -174,7 +174,7 @@ class GraphV2:
     def __init__(self, data: dict[str, Any], file_path: Path | None = None):
         self.name: str = data.get("name", "Untitled")
         self.description: str = data.get("description", "")
-        self.model: str = data.get("model", "gpt-4o")
+        self.model: str = data.get("model", "gpt-5.4")
         self.model_params: dict[str, Any] = data.get("model_params") or {}
         self.system_prompt_prefix: str = data.get("system_prompt_prefix", "")
         self.max_tool_iterations: int = data.get("max_tool_iterations", 10)

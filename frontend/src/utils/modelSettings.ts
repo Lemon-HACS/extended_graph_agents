@@ -9,15 +9,9 @@ export interface ModelSettings {
 }
 
 export const MODEL_PRESETS = [
-  { label: "GPT-4o", value: "gpt-4o" },
-  { label: "GPT-4o-mini", value: "gpt-4o-mini" },
-  { label: "GPT-4.1", value: "gpt-4.1" },
-  { label: "GPT-4.1-mini", value: "gpt-4.1-mini" },
-  { label: "GPT-4.1-nano", value: "gpt-4.1-nano" },
-  { label: "o4-mini", value: "o4-mini" },
-  { label: "Claude Sonnet 4", value: "claude-sonnet-4-20250514" },
-  { label: "Claude Haiku 3.5", value: "claude-haiku-4-5-20251001" },
-  { label: "Gemini 2.5 Flash", value: "gemini-2.5-flash-preview-04-17" },
+  { label: "GPT-5.4", value: "gpt-5.4" },
+  { label: "GPT-5.4-mini", value: "gpt-5.4-mini" },
+  { label: "GPT-5.4-nano", value: "gpt-5.4-nano" },
 ];
 
 const STORAGE_KEY = "ega_model_settings";
@@ -27,7 +21,7 @@ export function loadModelSettings(): ModelSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
-  return { model: "gpt-4o" };
+  return { model: "gpt-5.4" };
 }
 
 export function saveModelSettings(settings: ModelSettings): void {

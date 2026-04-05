@@ -19,15 +19,19 @@ export function ModelComboBox({ value, onChange, style, placeholder }: ModelComb
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 외부 클릭 시 닫기
+  // 외부 클릭 시 닫기 (Shadow DOM에서도 동작)
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (!containerRef.current) return;
+      const path = e.composedPath();
+      if (!path.includes(containerRef.current)) {
         setOpen(false);
       }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    // Shadow DOM 내부에서도 이벤트를 잡기 위해 가장 가까운 root에 등록
+    const root = containerRef.current?.getRootNode() || document;
+    root.addEventListener("mousedown", handler as EventListener);
+    return () => root.removeEventListener("mousedown", handler as EventListener);
   }, []);
 
   const filtered = MODEL_PRESETS.filter(
@@ -98,7 +102,7 @@ export function ModelComboBox({ value, onChange, style, placeholder }: ModelComb
         ▾
       </button>
       {open && (
-        <div style={S.dropdown}>
+        <div style={S.dropdown} onMouseDown={(e) => e.preventDefault()}>
           {filtered.map((p) => (
             <div
               key={p.value}
@@ -107,7 +111,7 @@ export function ModelComboBox({ value, onChange, style, placeholder }: ModelComb
                 background: p.value === value ? "#1e3a5f" : undefined,
                 fontWeight: p.value === value ? 600 : 400,
               }}
-              onClick={() => handleSelect(p.value)}
+              onMouseDown={(e) => { e.preventDefault(); handleSelect(p.value); }}
             >
               <span>{p.label}</span>
               <span style={S.optionValue}>{p.value}</span>
@@ -116,7 +120,7 @@ export function ModelComboBox({ value, onChange, style, placeholder }: ModelComb
           {showCustomEntry && (
             <div
               style={{ ...S.option, borderTop: "1px solid #334155" }}
-              onClick={() => handleSelect(search.trim())}
+              onMouseDown={(e) => { e.preventDefault(); handleSelect(search.trim()); }}
             >
               <span style={{ color: "#60a5fa" }}>"{search.trim()}" 직접 사용</span>
             </div>
