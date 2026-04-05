@@ -281,7 +281,9 @@ async def ws_ai_generate_v2(
 
     for attempt in range(2):
         try:
-            response = await client.chat.completions.create(
+            from .engine_v2 import _adaptive_chat_create
+            response = await _adaptive_chat_create(
+                client,
                 model=ai_model,
                 messages=messages,
                 response_format={"type": "json_object"},

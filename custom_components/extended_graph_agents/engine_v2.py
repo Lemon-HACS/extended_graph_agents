@@ -24,6 +24,47 @@ _LOGGER = logging.getLogger(__name__)
 
 MAX_GRAPH_STEPS = 50
 
+# ── 모델별 비지원 파라미터 런타임 캐시 ──
+# { "gpt-5.4": {"temperature", "top_p"}, "o4-mini": {"max_tokens"} }
+_UNSUPPORTED_PARAMS_CACHE: dict[str, set[str]] = {}
+
+
+async def _adaptive_chat_create(client: Any, **kwargs: Any) -> Any:
+    """LLM API 호출 — 비지원 파라미터를 자동 감지·제거 후 재시도.
+
+    첫 호출에서 400 'unsupported_parameter' 에러가 오면,
+    해당 파라미터를 제거하고 재시도. 결과를 모델별로 캐싱하여
+    이후 호출에서는 재시도 없이 바로 성공.
+    """
+    model = kwargs.get("model", "")
+
+    # 캐시된 비지원 파라미터 미리 제거
+    cached = _UNSUPPORTED_PARAMS_CACHE.get(model, set())
+    for param in cached:
+        kwargs.pop(param, None)
+
+    max_retries = 3  # 최대 3개 파라미터까지 연속 제거
+    for _ in range(max_retries):
+        try:
+            return await client.chat.completions.create(**kwargs)
+        except Exception as exc:
+            # OpenAI BadRequestError: 'unsupported_parameter'
+            err_body = getattr(exc, "body", None) or {}
+            if isinstance(err_body, dict) and err_body.get("code") == "unsupported_parameter":
+                bad_param = err_body.get("param", "")
+                if bad_param and bad_param in kwargs:
+                    _LOGGER.warning(
+                        "Model %s does not support '%s' — removing and retrying",
+                        model, bad_param,
+                    )
+                    kwargs.pop(bad_param)
+                    _UNSUPPORTED_PARAMS_CACHE.setdefault(model, set()).add(bad_param)
+                    continue
+            raise
+
+    # fallback: 재시도 다 소진 시 마지막 한 번 더 시도
+    return await client.chat.completions.create(**kwargs)
+
 
 @dataclass
 class NodeResult:
@@ -319,7 +360,7 @@ class EngineV2:
         total_completion = 0
 
         for _ in range(max_iterations):
-            response = await self.client.chat.completions.create(**api_kwargs)
+            response = await _adaptive_chat_create(self.client, **api_kwargs)
             usage = getattr(response, "usage", None)
             if usage:
                 total_prompt += getattr(usage, "prompt_tokens", 0) or 0
@@ -468,7 +509,7 @@ class EngineV2:
             if key in model_params:
                 router_kwargs[key] = model_params[key]
 
-        response = await self.client.chat.completions.create(**router_kwargs)
+        response = await _adaptive_chat_create(self.client, **router_kwargs)
         usage = getattr(response, "usage", None)
         content = response.choices[0].message.content
 
