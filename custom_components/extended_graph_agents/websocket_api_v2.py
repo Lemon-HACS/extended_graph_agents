@@ -285,7 +285,7 @@ async def ws_ai_generate_v2(
                 model=ai_model,
                 messages=messages,
                 response_format={"type": "json_object"},
-                max_tokens=8000,
+                max_completion_tokens=8000,
                 temperature=0.3,
             )
             parsed = json.loads(response.choices[0].message.content)

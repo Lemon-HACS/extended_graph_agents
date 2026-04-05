@@ -275,9 +275,11 @@ class EngineV2:
 
         # API kwargs
         api_kwargs: dict[str, Any] = {"model": model, "messages": messages}
-        for key in ("temperature", "top_p", "max_tokens"):
+        for key in ("temperature", "top_p"):
             if key in model_params:
                 api_kwargs[key] = model_params[key]
+        if "max_tokens" in model_params:
+            api_kwargs["max_completion_tokens"] = model_params["max_tokens"]
         if "reasoning_effort" in model_params:
             api_kwargs["reasoning_effort"] = model_params["reasoning_effort"]
 
