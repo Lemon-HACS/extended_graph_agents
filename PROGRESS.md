@@ -19,3 +19,5 @@
 - **Phase 2: 그래프 엔진 v2** — `engine_v2.py` (새 포맷 실행, dry-run 모드, 병렬 실행) + 8개 테스트
 - **Phase 3: WebSocket API v2** — `websocket_api_v2.py` (v2 CRUD, ai_generate, dry-run 지원)
 - **Phase 4: 대화형 채팅 UI** — `ChatPanel.tsx` (대화형 메인 인터페이스, 자동 테스트/수정 루프), `types_v2.ts`, `haApiV2.ts`, App.tsx 모드 전환 (chat/advanced), 프론트엔드 빌드 완료
+- **v2.0.0: 레거시 전면 제거** — v1 코드 11,700줄 삭제, 번들 538KB→160KB
+- **v2.0.1: 핵심 기능 보완** — 그래프 목록/관리 UI (상단 탭), Conversation 플랫폼 v2 (HA Assist 연동)

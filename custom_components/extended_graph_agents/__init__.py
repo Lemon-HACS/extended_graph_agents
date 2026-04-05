@@ -8,6 +8,7 @@ from typing import Any
 from openai import AsyncClient
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.components.frontend import async_register_built_in_panel
 from homeassistant.components.http import StaticPathConfig
@@ -19,6 +20,7 @@ from .const import (
 from .websocket_api_v2 import async_setup_websocket_api_v2
 
 _LOGGER = logging.getLogger(__name__)
+PLATFORMS = [Platform.CONVERSATION]
 
 type ExtendedGraphAgentsConfigEntry = ConfigEntry[AsyncClient]
 
@@ -136,6 +138,8 @@ async def async_setup_entry(
         }),
     )
 
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
     return True
 
 
@@ -143,4 +147,4 @@ async def async_unload_entry(
     hass: HomeAssistant, entry: ExtendedGraphAgentsConfigEntry
 ) -> bool:
     """Unload config entry."""
-    return True
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
