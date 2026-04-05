@@ -8,7 +8,7 @@ declare global {
 }
 
 interface HassData {
-  connection: import("./utils/haApi").HassConnection;
+  connection: import("./utils/haApiV2").HassConnection;
   auth: { data: { access_token: string } };
   language?: string;
 }

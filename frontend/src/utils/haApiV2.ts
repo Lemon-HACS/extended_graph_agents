@@ -1,6 +1,13 @@
 /** v2 WebSocket API 함수 */
-import type { HassConnection } from "./haApi";
 import type { GraphV2, GraphSummaryV2, RunResult, AiGenerateResult } from "../types_v2";
+
+export interface HassConnection {
+  sendMessagePromise: (msg: Record<string, unknown>) => Promise<unknown>;
+  subscribeMessage: (
+    callback: (msg: unknown) => void,
+    msg: Record<string, unknown>
+  ) => () => void;
+}
 
 const PREFIX = "extended_graph_agents/v2";
 

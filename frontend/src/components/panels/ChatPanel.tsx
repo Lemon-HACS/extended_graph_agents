@@ -16,17 +16,15 @@ import {
   Save,
   ChevronDown,
   ChevronRight,
-  Zap,
   Settings2,
 } from "lucide-react";
-import type { HassConnection } from "../../utils/haApi";
+import type { HassConnection } from "../../utils/haApiV2";
 import { aiGenerateV2, runGraphV2, saveGraphV2 } from "../../utils/haApiV2";
 import type { ChatMessage, GraphV2, RunResult } from "../../types_v2";
 
 interface ChatPanelProps {
   conn: HassConnection;
   language: string;
-  onOpenAdvanced?: (graph: GraphV2) => void;
 }
 
 const MODEL_PRESETS = [
@@ -36,7 +34,7 @@ const MODEL_PRESETS = [
   { label: "GPT-5.4", value: "gpt-5.4" },
 ];
 
-export function ChatPanel({ conn, language, onOpenAdvanced }: ChatPanelProps) {
+export function ChatPanel({ conn, language }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -330,7 +328,6 @@ export function ChatPanel({ conn, language, onOpenAdvanced }: ChatPanelProps) {
             key={msg.id}
             message={msg}
             onSave={handleSaveGraph}
-            onOpenAdvanced={onOpenAdvanced}
             onRunTest={(graph) => runAutoTest(graph, "테스트 입력", 0)}
           />
         ))}
@@ -376,12 +373,10 @@ export function ChatPanel({ conn, language, onOpenAdvanced }: ChatPanelProps) {
 function MessageBubble({
   message,
   onSave,
-  onOpenAdvanced,
   onRunTest,
 }: {
   message: ChatMessage;
   onSave: (graph: GraphV2) => void;
-  onOpenAdvanced?: (graph: GraphV2) => void;
   onRunTest: (graph: GraphV2) => void;
 }) {
   const [showGraph, setShowGraph] = useState(false);
@@ -445,11 +440,6 @@ function MessageBubble({
               <button style={styles.actionBtn} onClick={() => onRunTest(message.graph!)}>
                 <Play size={14} /> 테스트
               </button>
-              {onOpenAdvanced && (
-                <button style={styles.actionBtn} onClick={() => onOpenAdvanced(message.graph!)}>
-                  <Zap size={14} /> 고급 편집
-                </button>
-              )}
             </div>
           </div>
         )}

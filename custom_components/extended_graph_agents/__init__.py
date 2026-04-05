@@ -1,27 +1,24 @@
 """Extended Graph Agents integration."""
 from __future__ import annotations
 import logging
+import json
 import uuid
 from pathlib import Path
 from typing import Any
 from openai import AsyncClient
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.components.frontend import async_register_built_in_panel
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.helpers import config_validation as cv
-import json
 from .const import (
     CONF_API_KEY, CONF_BASE_URL, DEFAULT_BASE_URL, DEFAULT_CHAT_MODEL,
     DOMAIN, EVENT_GRAPH_EXECUTION_FINISHED, GRAPHS_SUBDIR,
 )
-from .websocket_api import async_setup_websocket_api
 from .websocket_api_v2 import async_setup_websocket_api_v2
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = [Platform.CONVERSATION]
 
 type ExtendedGraphAgentsConfigEntry = ConfigEntry[AsyncClient]
 
@@ -41,7 +38,6 @@ async def async_setup_entry(
     entry.runtime_data = client
 
     # Register WebSocket API
-    async_setup_websocket_api(hass)
     async_setup_websocket_api_v2(hass)
 
     # Register static files
@@ -78,21 +74,19 @@ async def async_setup_entry(
     except Exception as err:
         _LOGGER.warning("Could not register panel: %s", err)
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    # Register run_graph service
+    # Register run_graph service (v2 format)
     async def handle_run_graph(call: ServiceCall) -> None:
-        from .graph_engine import GraphEngine, ExecutionEvent
+        from .engine_v2 import EngineV2, ExecutionEvent
+        from .graph_v2 import GraphLoaderV2
         from .graph_state import GraphState
-        from .graph_loader import GraphLoader
         from .helpers import get_exposed_entities
-        from .exceptions import GraphNotFound, GraphExecutionError
+        from .exceptions import GraphNotFound
 
         graph_id: str = call.data["graph_id"]
         user_input: str = call.data.get("input", "")
 
         graphs_dir = Path(hass.config.config_dir) / GRAPHS_SUBDIR
-        loader = GraphLoader(str(graphs_dir))
+        loader = GraphLoaderV2(str(graphs_dir))
 
         try:
             graph = loader.load_by_id(graph_id)
@@ -112,14 +106,14 @@ async def async_setup_entry(
             trace.append({"type": event.event_type, **event.data})
 
         try:
-            engine = GraphEngine(
+            engine = EngineV2(
                 hass=hass,
                 client=entry.runtime_data,
                 default_model=graph.model or DEFAULT_CHAT_MODEL,
                 event_callback=on_event,
             )
             output = await engine.execute(graph, state, get_exposed_entities(hass))
-        except (GraphExecutionError, Exception) as err:
+        except Exception as err:
             _LOGGER.error("run_graph: execution failed for '%s': %s", graph_id, err)
             hass.bus.async_fire(
                 EVENT_GRAPH_EXECUTION_FINISHED,
@@ -149,4 +143,4 @@ async def async_unload_entry(
     hass: HomeAssistant, entry: ExtendedGraphAgentsConfigEntry
 ) -> bool:
     """Unload config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    return True

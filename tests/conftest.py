@@ -13,15 +13,8 @@ import pytest
 
 _COMP_DIR = Path(__file__).resolve().parent.parent / "custom_components" / "extended_graph_agents"
 
-# HA 의존 모듈 목록 — 이 모듈들은 로드하지 않음
-_HA_DEPENDENT_MODULES = {
-    "__init__", "config_flow", "conversation", "websocket_api",
-    "graph_engine", "helpers", "skill_loader",
-    "nodes", "functions",
-}
-
 # HA 의존성 없는 순수 Python 모듈 목록 (로드 순서 중요)
-_PURE_MODULES = ["exceptions", "graph_state", "graph_loader", "graph_v2", "engine_v2"]
+_PURE_MODULES = ["exceptions", "graph_state", "graph_v2", "engine_v2"]
 
 
 def _create_package_module(full_name: str) -> types.ModuleType:
@@ -60,41 +53,6 @@ for mod_name in _PURE_MODULES:
 
 
 # ── Fixtures ──
-
-@pytest.fixture
-def sample_legacy_graph():
-    """현재(레거시) 포맷의 그래프 dict."""
-    return {
-        "id": "test_graph",
-        "name": "테스트",
-        "model": "gpt-4o",
-        "nodes": [
-            {"id": "input_1", "type": "input"},
-            {
-                "id": "router_1",
-                "type": "router",
-                "prompt": "분류하세요",
-                "output_key": "intent",
-                "values": ["smart_home", "general"],
-            },
-            {
-                "id": "agent_1",
-                "type": "regular",
-                "prompt": "스마트홈 제어",
-            },
-            {"id": "output_1", "type": "output"},
-        ],
-        "edges": [
-            {"source": "input_1", "target": "router_1"},
-            {
-                "source": "router_1",
-                "target": "agent_1",
-                "condition": {"variable": "intent", "value": "smart_home"},
-            },
-            {"source": "agent_1", "target": "output_1"},
-        ],
-    }
-
 
 @pytest.fixture
 def mock_hass():

@@ -7,14 +7,13 @@ CONF_MAX_TOKENS = "max_tokens"
 CONF_TEMPERATURE = "temperature"
 CONF_GRAPH_ID = "graph_id"
 
-DEFAULT_CHAT_MODEL = "gpt-5.4"
-DEFAULT_AI_ASSIST_MODEL = "gpt-5.4"
+DEFAULT_CHAT_MODEL = "gpt-4o"
+DEFAULT_AI_ASSIST_MODEL = "gpt-4o"
 DEFAULT_MAX_TOKENS = 2000
 DEFAULT_TEMPERATURE = 1.0
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 
 GRAPHS_SUBDIR = "extended_graph_agents/graphs"
-SKILLS_SUBDIR = "extended_graph_agents/skills"
 
 EVENT_GRAPH_EXECUTION_STARTED = f"{DOMAIN}_execution_started"
 EVENT_GRAPH_EXECUTION_FINISHED = f"{DOMAIN}_execution_finished"
@@ -22,5 +21,3 @@ EVENT_NODE_STARTED = f"{DOMAIN}_node_started"
 EVENT_NODE_FINISHED = f"{DOMAIN}_node_finished"
 EVENT_GRAPH_SAVED = f"{DOMAIN}_graph_saved"
 EVENT_GRAPH_DELETED = f"{DOMAIN}_graph_deleted"
-EVENT_SKILL_SAVED = f"{DOMAIN}_skill_saved"
-EVENT_SKILL_DELETED = f"{DOMAIN}_skill_deleted"
