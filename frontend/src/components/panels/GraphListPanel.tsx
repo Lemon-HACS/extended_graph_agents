@@ -31,6 +31,7 @@ import {
 } from "../../utils/haApiV2";
 import type { GraphSummaryV2, GraphV2, RunResult } from "../../types_v2";
 import { GraphFlowView } from "../GraphFlowView";
+import yaml from "js-yaml";
 
 interface GraphListPanelProps {
   conn: HassConnection;
@@ -498,14 +499,13 @@ function ModeBtn({ active, onClick, icon, label, dirty }: {
 
 function graphToYaml(graph: GraphV2): string {
   const obj: any = { ...graph };
-  // id는 편집 불필요
   delete obj.id;
-  return JSON.stringify(obj, null, 2);
+  return yaml.dump(obj, { lineWidth: 120, noRefs: true, sortKeys: false });
 }
 
 function yamlParse(text: string): any {
   try {
-    return JSON.parse(text);
+    return yaml.load(text);
   } catch {
     return null;
   }
