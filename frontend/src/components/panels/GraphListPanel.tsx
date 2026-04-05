@@ -34,11 +34,12 @@ import type { GraphSummaryV2, GraphV2, RunResult } from "../../types_v2";
 import { GraphFlowView } from "../GraphFlowView";
 import yaml from "js-yaml";
 import {
-  MODEL_PRESETS,
   loadModelSettings,
   saveModelSettings,
   type ModelSettings,
 } from "../../utils/modelSettings";
+import { ModelComboBox } from "../ModelComboBox";
+import type { ModelParams } from "../../types_v2";
 
 interface GraphListPanelProps {
   conn: HassConnection;
@@ -181,6 +182,7 @@ function GraphDetailView({
   const [editingModel, setEditingModel] = useState(false);
   const [modelSettings] = useState<ModelSettings>(loadModelSettings);
   const [selectedModel, setSelectedModel] = useState(graph.model || modelSettings.model);
+  const [editParams, setEditParams] = useState<ModelParams>(graph.model_params || {});
 
   // YAML 초기화
   useEffect(() => {
@@ -188,11 +190,18 @@ function GraphDetailView({
     setYamlDirty(false);
   }, [graph]);
 
-  // 모델 변경 저장
+  // 모델 + 파라미터 변경 저장
   const handleSaveModel = async () => {
     setSaving(true);
     try {
-      const updated = { ...graph, model: selectedModel };
+      // undefined 값 정리
+      const cleanParams: ModelParams = {};
+      if (editParams.temperature != null) cleanParams.temperature = editParams.temperature;
+      if (editParams.top_p != null) cleanParams.top_p = editParams.top_p;
+      if (editParams.max_tokens != null) cleanParams.max_tokens = editParams.max_tokens;
+      if (editParams.reasoning_effort) cleanParams.reasoning_effort = editParams.reasoning_effort;
+
+      const updated = { ...graph, model: selectedModel, model_params: cleanParams };
       const result = await saveGraphV2(conn, updated);
       const fetched = await getGraphV2(conn, result.id);
       onGraphUpdated(fetched);
@@ -202,6 +211,10 @@ function GraphDetailView({
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateEditParam = (patch: Partial<ModelParams>) => {
+    setEditParams((prev) => ({ ...prev, ...patch }));
   };
 
   const handleSaveYaml = async () => {
@@ -254,30 +267,67 @@ function GraphDetailView({
               {graph.name}
             </div>
             {editingModel ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
-                <select
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                  style={{ ...S.modelSelect, fontSize: "11px" }}
-                >
-                  {MODEL_PRESETS.map((p) => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
-                  ))}
-                </select>
-                <button style={{ ...S.miniBtn, color: "#22c55e" }} onClick={handleSaveModel} disabled={saving}>
-                  <Save size={10} />
-                </button>
-                <button style={{ ...S.miniBtn, color: "#64748b" }} onClick={() => { setEditingModel(false); setSelectedModel(graph.model); }}>
-                  ✕
-                </button>
+              <div style={S.modelEditArea}>
+                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <ModelComboBox
+                    value={selectedModel}
+                    onChange={setSelectedModel}
+                    style={{ width: "180px" }}
+                  />
+                  <button style={{ ...S.miniBtn, color: "#22c55e" }} onClick={handleSaveModel} disabled={saving}>
+                    <Save size={10} />
+                  </button>
+                  <button style={{ ...S.miniBtn, color: "#64748b" }} onClick={() => { setEditingModel(false); setSelectedModel(graph.model); setEditParams(graph.model_params || {}); }}>
+                    ✕
+                  </button>
+                </div>
+                <div style={S.paramRow}>
+                  <label style={S.paramLabel}>
+                    Temp:
+                    <input type="number" min={0} max={2} step={0.1}
+                      value={editParams.temperature ?? ""} placeholder="기본"
+                      onChange={(e) => updateEditParam({ temperature: e.target.value ? Number(e.target.value) : undefined })}
+                      style={S.paramInput} />
+                  </label>
+                  <label style={S.paramLabel}>
+                    Top P:
+                    <input type="number" min={0} max={1} step={0.05}
+                      value={editParams.top_p ?? ""} placeholder="기본"
+                      onChange={(e) => updateEditParam({ top_p: e.target.value ? Number(e.target.value) : undefined })}
+                      style={S.paramInput} />
+                  </label>
+                  <label style={S.paramLabel}>
+                    Max Tok:
+                    <input type="number" min={100} step={100}
+                      value={editParams.max_tokens ?? ""} placeholder="기본"
+                      onChange={(e) => updateEditParam({ max_tokens: e.target.value ? Number(e.target.value) : undefined })}
+                      style={{ ...S.paramInput, width: "60px" }} />
+                  </label>
+                  <label style={S.paramLabel}>
+                    Reasoning:
+                    <select
+                      value={editParams.reasoning_effort ?? ""}
+                      onChange={(e) => updateEditParam({ reasoning_effort: (e.target.value || undefined) as ModelParams["reasoning_effort"] })}
+                      style={S.paramSelect}
+                    >
+                      <option value="">기본</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </label>
+                </div>
               </div>
             ) : (
               <div
                 style={{ fontSize: "11px", color: "#64748b", cursor: "pointer" }}
                 onClick={() => setEditingModel(true)}
-                title="클릭하여 모델 변경"
+                title="클릭하여 모델/파라미터 변경"
               >
-                {graph.model} · {Object.keys(graph.nodes).length}개 노드
+                {graph.model}
+                {graph.model_params?.reasoning_effort ? ` · reasoning: ${graph.model_params.reasoning_effort}` : ""}
+                {graph.model_params?.temperature != null ? ` · temp: ${graph.model_params.temperature}` : ""}
+                {" "}· {Object.keys(graph.nodes).length}개 노드
               </div>
             )}
           </div>
@@ -667,9 +717,22 @@ const S: Record<string, React.CSSProperties> = {
     borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer",
   },
   // Model editing
-  modelSelect: {
+  modelEditArea: {
+    display: "flex", flexDirection: "column", gap: "4px", marginTop: "2px",
+  },
+  paramRow: {
+    display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap",
+  },
+  paramLabel: {
+    display: "flex", alignItems: "center", gap: "3px", fontSize: "10px", color: "#94a3b8",
+  },
+  paramInput: {
     background: "#1e293b", color: "#e2e8f0", border: "1px solid #334155",
-    borderRadius: "4px", padding: "1px 4px", outline: "none",
+    borderRadius: "3px", padding: "1px 4px", fontSize: "10px", outline: "none", width: "45px",
+  },
+  paramSelect: {
+    background: "#1e293b", color: "#e2e8f0", border: "1px solid #334155",
+    borderRadius: "3px", padding: "1px 4px", fontSize: "10px", outline: "none",
   },
   miniBtn: {
     background: "none", border: "none", cursor: "pointer", padding: "2px", display: "flex",

@@ -22,11 +22,11 @@ import { aiGenerateV2, runGraphV2, saveGraphV2 } from "../../utils/haApiV2";
 import type { ChatMessage, GraphV2, RunResult } from "../../types_v2";
 import { GraphFlowView } from "../GraphFlowView";
 import {
-  MODEL_PRESETS,
   loadModelSettings,
   saveModelSettings,
   type ModelSettings,
 } from "../../utils/modelSettings";
+import { ModelComboBox } from "../ModelComboBox";
 
 interface ChatPanelProps {
   conn: HassConnection;
@@ -267,15 +267,11 @@ export function ChatPanel({ conn, language }: ChatPanelProps) {
         <div style={styles.settingsRow}>
           <label style={styles.settingLabel}>
             모델:
-            <select
+            <ModelComboBox
               value={model}
-              onChange={(e) => updateModelSettings({ model: e.target.value })}
-              style={styles.select}
-            >
-              {MODEL_PRESETS.map((p) => (
-                <option key={p.value} value={p.value}>{p.label}</option>
-              ))}
-            </select>
+              onChange={(v) => updateModelSettings({ model: v })}
+              style={{ width: "200px" }}
+            />
           </label>
           <label style={styles.settingLabel}>
             <input type="checkbox" checked={autoTest} onChange={(e) => setAutoTest(e.target.checked)} />
