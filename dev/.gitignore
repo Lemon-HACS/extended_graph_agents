@@ -1,0 +1,10 @@
+# HA 런타임 데이터 (git에 올리지 않음)
+config/.storage/
+config/.cloud/
+config/deps/
+config/tts/
+config/home-assistant_v2.db*
+config/.HA_VERSION
+config/blueprints/
+config/image/
+config/.cache/

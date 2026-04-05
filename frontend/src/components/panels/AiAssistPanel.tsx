@@ -156,6 +156,7 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
         conn, scope, trimmed, currentYaml, apiHistory, getContext(scope),
         { include_ha_context: scope === "auto" ? true : includeHaContext, language, model: aiModel }
       );
+      console.log("[AI Assist] 응답 수신 (scope=%s):", scope, result);
 
       if (scope === "auto" && result.skills !== undefined) {
         console.log("[AI Auto] 응답 수신:", {
@@ -188,7 +189,12 @@ export function AiAssistPanel({ conn, onClose, isMobile, panelWidth = 380, onOpe
         }]);
       }
     } catch (err) {
-      setError(String(err));
+      console.error("[AI Assist] 에러 발생:", err);
+      if (err && typeof err === "object" && "message" in err) {
+        setError(String((err as { message: unknown }).message));
+      } else {
+        setError(String(err));
+      }
     } finally {
       setIsLoading(false);
     }

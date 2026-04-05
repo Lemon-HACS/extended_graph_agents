@@ -18,6 +18,7 @@ from .const import (
     DOMAIN, EVENT_GRAPH_EXECUTION_FINISHED, GRAPHS_SUBDIR,
 )
 from .websocket_api import async_setup_websocket_api
+from .websocket_api_v2 import async_setup_websocket_api_v2
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [Platform.CONVERSATION]
@@ -41,6 +42,7 @@ async def async_setup_entry(
 
     # Register WebSocket API
     async_setup_websocket_api(hass)
+    async_setup_websocket_api_v2(hass)
 
     # Register static files
     www_dir = Path(__file__).parent / "www"

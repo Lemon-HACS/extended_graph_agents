@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  homeassistant:
+    container_name: ha-dev
+    image: ghcr.io/home-assistant/home-assistant:stable
+    volumes:
+      - ./config:/config
+      # 컴포넌트 소스 직접 마운트 — HACS 불필요
+      - ../custom_components/extended_graph_agents:/config/custom_components/extended_graph_agents
+    ports:
+      - "8123:8123"
+    environment:
+      - TZ=Asia/Seoul
+    restart: unless-stopped

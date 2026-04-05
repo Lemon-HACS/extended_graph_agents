@@ -1,0 +1,140 @@
+# Extended Graph Agents 개발용 HA 설정
+homeassistant:
+  name: "Dev Home"
+  unit_system: metric
+  time_zone: Asia/Seoul
+  language: ko
+
+# HTTP 설정 (개발용)
+http:
+  server_port: 8123
+
+# 로거 설정 — 컴포넌트 디버그 로그 활성화
+logger:
+  default: info
+  logs:
+    custom_components.extended_graph_agents: debug
+
+# ──────────────────────────────────
+# 가짜 엔티티들 (테스트용)
+# ──────────────────────────────────
+
+# 조명 시뮬레이션
+input_boolean:
+  living_room_light:
+    name: "거실 조명"
+    icon: mdi:ceiling-light
+  bedroom_light:
+    name: "침실 조명"
+    icon: mdi:lamp
+  kitchen_light:
+    name: "주방 조명"
+    icon: mdi:lightbulb
+
+# 온도 센서 시뮬레이션
+input_number:
+  living_room_temperature:
+    name: "거실 온도"
+    min: -10
+    max: 45
+    step: 0.5
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+    initial: 24.5
+  bedroom_temperature:
+    name: "침실 온도"
+    min: -10
+    max: 45
+    step: 0.5
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+    initial: 22.0
+  outdoor_temperature:
+    name: "실외 온도"
+    min: -30
+    max: 50
+    step: 0.5
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+    initial: 15.0
+
+# 습도 센서 시뮬레이션
+  living_room_humidity:
+    name: "거실 습도"
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    icon: mdi:water-percent
+    initial: 55
+
+# 에어컨/난방 시뮬레이션
+input_select:
+  aircon_mode:
+    name: "에어컨 모드"
+    options:
+      - "off"
+      - cooling
+      - heating
+      - auto
+    initial: "off"
+    icon: mdi:air-conditioner
+  aircon_target_temp:
+    name: "에어컨 설정 온도"
+    options:
+      - "18"
+      - "20"
+      - "22"
+      - "24"
+      - "26"
+      - "28"
+    initial: "24"
+
+# 도어/모션 센서 시뮬레이션
+  front_door:
+    name: "현관문"
+    options:
+      - open
+      - closed
+    initial: closed
+    icon: mdi:door
+  motion_living_room:
+    name: "거실 모션"
+    options:
+      - detected
+      - clear
+    initial: clear
+    icon: mdi:motion-sensor
+
+# 템플릿 센서 (input_number를 센서처럼 노출)
+template:
+  - sensor:
+      - name: "거실 온도 센서"
+        unique_id: sensor_living_room_temp
+        unit_of_measurement: "°C"
+        state: "{{ states('input_number.living_room_temperature') }}"
+        device_class: temperature
+      - name: "침실 온도 센서"
+        unique_id: sensor_bedroom_temp
+        unit_of_measurement: "°C"
+        state: "{{ states('input_number.bedroom_temperature') }}"
+        device_class: temperature
+      - name: "실외 온도 센서"
+        unique_id: sensor_outdoor_temp
+        unit_of_measurement: "°C"
+        state: "{{ states('input_number.outdoor_temperature') }}"
+        device_class: temperature
+      - name: "거실 습도 센서"
+        unique_id: sensor_living_room_humidity
+        unit_of_measurement: "%"
+        state: "{{ states('input_number.living_room_humidity') }}"
+        device_class: humidity
+  - binary_sensor:
+      - name: "현관문 센서"
+        unique_id: binary_sensor_front_door
+        state: "{{ is_state('input_select.front_door', 'open') }}"
+        device_class: door
+      - name: "거실 모션 센서"
+        unique_id: binary_sensor_motion_living_room
+        state: "{{ is_state('input_select.motion_living_room', 'detected') }}"
+        device_class: motion

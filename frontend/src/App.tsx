@@ -8,6 +8,7 @@ import { EdgeConfigPanel } from "./components/panels/EdgeConfigPanel";
 import { GraphSettingsPanel } from "./components/panels/GraphSettingsPanel";
 import { DebugRunPanel } from "./components/panels/DebugRunPanel";
 import { AiAssistPanel } from "./components/panels/AiAssistPanel";
+import { ChatPanel } from "./components/panels/ChatPanel";
 import { useGraphStore } from "./store/graphStore";
 import { useSkillStore } from "./store/skillStore";
 import { listGraphs, getGraph, saveGraph, deleteGraph, listSkills } from "./utils/haApi";
@@ -16,6 +17,7 @@ import { graphToYaml } from "./utils/serializer";
 import { useWindowSize } from "./hooks/useWindowSize";
 import { LangContext, useLang } from "./contexts/LangContext";
 import { getTranslations } from "./utils/i18n";
+import type { GraphV2 } from "./types_v2";
 
 interface AppProps {
   hass: {
@@ -27,6 +29,7 @@ interface AppProps {
 
 export function App({ hass }: AppProps) {
   const t = getTranslations(hass.language ?? "en");
+  const [appMode, setAppMode] = useState<"chat" | "advanced">("chat");
   const [showYaml, setShowYaml] = useState(false);
   const [showGraphSettings, setShowGraphSettings] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -133,11 +136,83 @@ export function App({ hass }: AppProps) {
       })()
     : "";
 
+  const handleOpenAdvanced = useCallback((graph: GraphV2) => {
+    // v2 그래프를 기존 편집기로 열기 (간단한 변환)
+    // TODO: 완전한 v2 → v1 변환은 나중에. 지금은 모드 전환만.
+    setAppMode("advanced");
+  }, []);
+
+  // Chat 모드 — 메인 대화형 인터페이스
+  if (appMode === "chat") {
+    return (
+      <LangContext.Provider value={t}>
+        <div
+          style={{
+            display: "flex",
+            height: "100%",
+            width: "100%",
+            background: "#020817",
+            color: "white",
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+            {/* 모드 전환 탭 */}
+            <div style={{
+              display: "flex",
+              borderBottom: "1px solid #1e293b",
+              background: "#0a0f1e",
+              flexShrink: 0,
+            }}>
+              <button
+                onClick={() => setAppMode("chat")}
+                style={{
+                  background: "none",
+                  border: "none",
+                  borderBottom: "2px solid #3b82f6",
+                  color: "#60a5fa",
+                  padding: "10px 20px",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                💬 대화
+              </button>
+              <button
+                onClick={() => setAppMode("advanced")}
+                style={{
+                  background: "none",
+                  border: "none",
+                  borderBottom: "2px solid transparent",
+                  color: "#64748b",
+                  padding: "10px 20px",
+                  cursor: "pointer",
+                  fontSize: 13,
+                }}
+              >
+                ⚙ 고급 편집기
+              </button>
+            </div>
+            <ChatPanel
+              conn={conn}
+              language={hass.language ?? "en"}
+              onOpenAdvanced={handleOpenAdvanced}
+            />
+          </div>
+        </div>
+      </LangContext.Provider>
+    );
+  }
+
+  // Advanced 모드 — 기존 그래프 편집기
   return (
     <LangContext.Provider value={t}>
     <div
       style={{
         display: "flex",
+        flexDirection: "column",
         height: "100%",
         width: "100%",
         background: "#020817",
@@ -148,6 +223,45 @@ export function App({ hass }: AppProps) {
         position: "relative",
       }}
     >
+      {/* 모드 전환 탭 */}
+      <div style={{
+        display: "flex",
+        borderBottom: "1px solid #1e293b",
+        background: "#0a0f1e",
+        flexShrink: 0,
+      }}>
+        <button
+          onClick={() => setAppMode("chat")}
+          style={{
+            background: "none",
+            border: "none",
+            borderBottom: "2px solid transparent",
+            color: "#64748b",
+            padding: "10px 20px",
+            cursor: "pointer",
+            fontSize: 13,
+          }}
+        >
+          💬 대화
+        </button>
+        <button
+          onClick={() => setAppMode("advanced")}
+          style={{
+            background: "none",
+            border: "none",
+            borderBottom: "2px solid #3b82f6",
+            color: "#60a5fa",
+            padding: "10px 20px",
+            cursor: "pointer",
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          ⚙ 고급 편집기
+        </button>
+      </div>
+
+      <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
       {/* Mobile sidebar backdrop */}
       {isMobile && showSidebar && (
         <div
@@ -435,6 +549,7 @@ export function App({ hass }: AppProps) {
           </>
         )}
       </div>
+    </div>
     </div>
     </LangContext.Provider>
   );
