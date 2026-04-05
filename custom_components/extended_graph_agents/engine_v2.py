@@ -366,11 +366,8 @@ class EngineV2:
                 if tool_def is None:
                     tool_result = f"Tool '{func_name}' not found"
                 elif self.dry_run and tool_def.tool_type == "native":
-                    # Dry-run: don't execute service calls
-                    tool_result = (
-                        f"[DRY RUN] Would call service '{tool_def.service}' "
-                        f"with args: {json.dumps(args, ensure_ascii=False)}"
-                    )
+                    # Dry-run: validate without executing
+                    tool_result = self._validate_native_tool(tool_def, args)
                 else:
                     tool_result = await self._execute_tool(tool_def, args, exposed_entities)
 
@@ -559,6 +556,63 @@ class EngineV2:
 
     # 도메인 무관하게 작동하는 범용 서비스 목록
     _GENERIC_SERVICES = {"turn_on", "turn_off", "toggle"}
+
+    def _validate_native_tool(self, tool: ToolDef, args: dict[str, Any]) -> str:
+        """Dry-run: validate service call without executing."""
+        service = tool.service
+        if not service:
+            return "[DRY RUN ERROR] No service specified"
+
+        parts = service.split(".", 1)
+        if len(parts) != 2:
+            return f"[DRY RUN ERROR] Invalid service format: {service}"
+
+        domain, service_name = parts
+        errors: list[str] = []
+        warnings: list[str] = []
+
+        # 1. 서비스 존재 여부 확인
+        available_services = self.hass.services.async_services()
+        if domain not in available_services:
+            errors.append(f"도메인 '{domain}'이 존재하지 않습니다")
+        elif service_name not in available_services.get(domain, {}):
+            # homeassistant.* 범용 서비스로 대체 가능한지 확인
+            if service_name in self._GENERIC_SERVICES:
+                warnings.append(
+                    f"'{domain}.{service_name}' 서비스가 없지만 "
+                    f"homeassistant.{service_name}으로 대체 가능합니다"
+                )
+            else:
+                errors.append(f"서비스 '{domain}.{service_name}'이 존재하지 않습니다")
+
+        # 2. 엔티티 존재 여부 확인
+        entity_id = args.get("entity_id", "")
+        if entity_id:
+            state = self.hass.states.get(entity_id)
+            if state is None:
+                errors.append(f"엔티티 '{entity_id}'가 존재하지 않습니다")
+            else:
+                # 3. 서비스 도메인과 엔티티 도메인 일치 여부
+                entity_domain = entity_id.split(".", 1)[0]
+                if entity_domain != domain and service_name in self._GENERIC_SERVICES:
+                    warnings.append(
+                        f"도메인 불일치: {domain}.{service_name} ← {entity_id}. "
+                        f"실행 시 homeassistant.{service_name}으로 자동 리매핑됩니다"
+                    )
+                elif entity_domain != domain:
+                    errors.append(
+                        f"도메인 불일치: '{domain}.{service_name}'을 "
+                        f"'{entity_id}'에 호출할 수 없습니다"
+                    )
+
+        # 결과 조합
+        if errors:
+            return f"[DRY RUN ERROR] {'; '.join(errors)}"
+
+        result = f"[DRY RUN OK] {service}({json.dumps(args, ensure_ascii=False)})"
+        if warnings:
+            result += f" ⚠ {'; '.join(warnings)}"
+        return result
 
     async def _execute_native_tool(self, tool: ToolDef, args: dict[str, Any]) -> str:
         """Execute a native HA service call."""

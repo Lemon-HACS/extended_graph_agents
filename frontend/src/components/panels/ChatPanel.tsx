@@ -154,11 +154,20 @@ export function ChatPanel({ conn, language }: ChatPanelProps) {
         prev.filter((m) => !(m.role === "system" && m.content.includes("테스트 중")))
       );
 
-      if (runResult.error) {
+      // trace에서 DRY RUN ERROR 검출
+      const dryRunErrors = runResult.trace
+        .filter((e) => e.result?.includes("[DRY RUN ERROR]") || e.error)
+        .map((e) => e.result || e.error || "")
+        .filter(Boolean);
+      const hasError = !!runResult.error || dryRunErrors.length > 0;
+      const errorSummary = runResult.error
+        || dryRunErrors.join("\n");
+
+      if (hasError) {
         // 에러 발생 → 자동 수정 시도
         addMessage({
           role: "assistant",
-          content: `⚠️ 테스트에서 오류 발견: ${runResult.error}`,
+          content: `⚠️ 테스트에서 오류 발견: ${errorSummary}`,
           runResult,
         });
 
@@ -170,7 +179,7 @@ export function ChatPanel({ conn, language }: ChatPanelProps) {
 
           try {
             const fixResult = await aiGenerateV2(conn, {
-              request: `이전에 생성한 그래프에서 다음 오류가 발생했습니다. 수정해주세요:\n\n오류: ${runResult.error}\n\n실행 트레이스:\n${JSON.stringify(runResult.trace, null, 2)}`,
+              request: `이전에 생성한 그래프에서 다음 오류가 발생했습니다. 수정해주세요:\n\n오류: ${errorSummary}\n\n실행 트레이스:\n${JSON.stringify(runResult.trace, null, 2)}`,
               current_graph: graph,
               language,
               model,
