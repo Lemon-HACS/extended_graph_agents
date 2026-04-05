@@ -21,6 +21,7 @@ import {
   runGraphV2,
 } from "../../utils/haApiV2";
 import type { GraphSummaryV2, GraphV2, RunResult } from "../../types_v2";
+import { GraphFlowView } from "../GraphFlowView";
 
 interface GraphListPanelProps {
   conn: HassConnection;
@@ -181,27 +182,26 @@ export function GraphListPanel({ conn, language }: GraphListPanelProps) {
               {/* Expanded detail */}
               {isOpen && detail && (
                 <div style={styles.detail}>
+                  {/* Graph flow visualization */}
+                  <div style={styles.section}>
+                    <div style={styles.sectionTitle}>그래프 플로우</div>
+                    <GraphFlowView graph={detail.graph} height={250} />
+                  </div>
+
                   {/* Node list */}
                   <div style={styles.section}>
-                    <div style={styles.sectionTitle}>노드</div>
+                    <div style={styles.sectionTitle}>
+                      노드 ({Object.keys(detail.graph.nodes).length}개)
+                    </div>
                     <div style={styles.nodeList}>
                       {Object.entries(detail.graph.nodes).map(([name, node]) => (
                         <div key={name} style={styles.nodeTag}>
                           <span style={styles.nodeType}>{node.type}</span>
                           {name}
+                          {node.tools && node.tools.length > 0 && (
+                            <span style={styles.toolBadge}>{node.tools.length} tools</span>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Edges */}
-                  <div style={styles.section}>
-                    <div style={styles.sectionTitle}>엣지</div>
-                    <div style={styles.edgeList}>
-                      {detail.graph.edges.map((edge, i) => (
-                        <code key={i} style={styles.edgeCode}>
-                          {typeof edge === "string" ? edge : JSON.stringify(edge)}
-                        </code>
                       ))}
                     </div>
                   </div>
@@ -455,6 +455,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     fontSize: "10px",
     textTransform: "uppercase",
+  },
+  toolBadge: {
+    color: "#64748b",
+    fontSize: "10px",
+    marginLeft: "4px",
   },
   edgeList: {
     display: "flex",

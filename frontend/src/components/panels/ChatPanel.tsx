@@ -21,6 +21,7 @@ import {
 import type { HassConnection } from "../../utils/haApiV2";
 import { aiGenerateV2, runGraphV2, saveGraphV2 } from "../../utils/haApiV2";
 import type { ChatMessage, GraphV2, RunResult } from "../../types_v2";
+import { GraphFlowView } from "../GraphFlowView";
 
 interface ChatPanelProps {
   conn: HassConnection;
@@ -414,23 +415,7 @@ function MessageBubble({
             </button>
             {showGraph && (
               <div style={styles.graphPreview}>
-                <div style={styles.graphNodes}>
-                  {Object.entries(message.graph.nodes).map(([name, node]) => (
-                    <div key={name} style={styles.nodeTag}>
-                      <span style={styles.nodeType}>{node.type}</span>
-                      {name}
-                    </div>
-                  ))}
-                </div>
-                <div style={styles.graphEdges}>
-                  {message.graph.edges.map((edge, i) => (
-                    <div key={i} style={styles.edgeText}>
-                      {typeof edge === "string"
-                        ? edge
-                        : JSON.stringify(edge)}
-                    </div>
-                  ))}
-                </div>
+                <GraphFlowView graph={message.graph} height={200} />
               </div>
             )}
             <div style={styles.graphActions}>
@@ -654,39 +639,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   graphPreview: {
     marginTop: "6px",
-    padding: "8px",
-    background: "#0f172a",
     borderRadius: "6px",
-    fontSize: "12px",
-  },
-  graphNodes: {
-    display: "flex",
-    flexWrap: "wrap" as const,
-    gap: "4px",
-    marginBottom: "6px",
-  },
-  nodeTag: {
-    display: "flex",
-    alignItems: "center",
-    gap: "4px",
-    background: "#1e293b",
-    borderRadius: "4px",
-    padding: "2px 6px",
-    fontSize: "12px",
-  },
-  nodeType: {
-    color: "#60a5fa",
-    fontWeight: 600,
-    fontSize: "10px",
-    textTransform: "uppercase" as const,
-  },
-  graphEdges: {
-    color: "#64748b",
-    fontSize: "11px",
-  },
-  edgeText: {
-    fontFamily: "monospace",
-    padding: "1px 0",
+    overflow: "hidden",
   },
   graphActions: {
     display: "flex",
