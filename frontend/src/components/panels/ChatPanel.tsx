@@ -16,36 +16,45 @@ import {
   Save,
   ChevronDown,
   ChevronRight,
-  Settings2,
 } from "lucide-react";
 import type { HassConnection } from "../../utils/haApiV2";
 import { aiGenerateV2, runGraphV2, saveGraphV2 } from "../../utils/haApiV2";
 import type { ChatMessage, GraphV2, RunResult } from "../../types_v2";
 import { GraphFlowView } from "../GraphFlowView";
+import {
+  MODEL_PRESETS,
+  loadModelSettings,
+  saveModelSettings,
+  type ModelSettings,
+} from "../../utils/modelSettings";
 
 interface ChatPanelProps {
   conn: HassConnection;
   language: string;
 }
 
-const MODEL_PRESETS = [
-  { label: "GPT-4o", value: "gpt-4o" },
-  { label: "GPT-4.1", value: "gpt-4.1" },
-  { label: "GPT-5-mini", value: "gpt-5-mini" },
-  { label: "GPT-5.4", value: "gpt-5.4" },
-];
-
 export function ChatPanel({ conn, language }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [model, setModel] = useState("gpt-4o");
-  const [showSettings, setShowSettings] = useState(false);
   const [autoTest, setAutoTest] = useState(true);
   const [autoFix, setAutoFix] = useState(true);
   const [maxFixAttempts, setMaxFixAttempts] = useState(3);
+  const [showAdvancedModel, setShowAdvancedModel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // 모델 설정 (localStorage 영속화)
+  const [modelSettings, setModelSettings] = useState<ModelSettings>(loadModelSettings);
+  const model = modelSettings.model;
+
+  const updateModelSettings = useCallback((patch: Partial<ModelSettings>) => {
+    setModelSettings((prev) => {
+      const next = { ...prev, ...patch };
+      saveModelSettings(next);
+      return next;
+    });
+  }, []);
 
   // 현재 작업 중인 그래프
   const [currentGraph, setCurrentGraph] = useState<GraphV2 | null>(null);
@@ -253,55 +262,93 @@ export function ChatPanel({ conn, language }: ChatPanelProps) {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.headerLeft}>
-          <Bot size={20} style={{ color: "#60a5fa" }} />
-          <span style={styles.headerTitle}>Graph Agent Builder</span>
-        </div>
-        <button
-          style={styles.settingsBtn}
-          onClick={() => setShowSettings(!showSettings)}
-        >
-          <Settings2 size={16} />
-        </button>
-      </div>
-
-      {/* Settings bar */}
-      {showSettings && (
-        <div style={styles.settingsBar}>
+      {/* Settings bar — always visible */}
+      <div style={styles.settingsBar}>
+        <div style={styles.settingsRow}>
           <label style={styles.settingLabel}>
             모델:
             <select
               value={model}
-              onChange={(e) => setModel(e.target.value)}
+              onChange={(e) => updateModelSettings({ model: e.target.value })}
               style={styles.select}
             >
               {MODEL_PRESETS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
+                <option key={p.value} value={p.value}>{p.label}</option>
               ))}
             </select>
           </label>
           <label style={styles.settingLabel}>
-            <input
-              type="checkbox"
-              checked={autoTest}
-              onChange={(e) => setAutoTest(e.target.checked)}
-            />
+            <input type="checkbox" checked={autoTest} onChange={(e) => setAutoTest(e.target.checked)} />
             자동 테스트
           </label>
           <label style={styles.settingLabel}>
-            <input
-              type="checkbox"
-              checked={autoFix}
-              onChange={(e) => setAutoFix(e.target.checked)}
-            />
-            자동 수정 (최대 {maxFixAttempts}회)
+            <input type="checkbox" checked={autoFix} onChange={(e) => setAutoFix(e.target.checked)} />
+            자동 수정 ({maxFixAttempts}회)
           </label>
+          <button
+            style={{ ...styles.settingsToggle, color: showAdvancedModel ? "#60a5fa" : "#64748b" }}
+            onClick={() => setShowAdvancedModel(!showAdvancedModel)}
+          >
+            {showAdvancedModel ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            세부
+          </button>
         </div>
-      )}
+        {showAdvancedModel && (
+          <div style={styles.settingsRow}>
+            <label style={styles.settingLabel}>
+              Temperature:
+              <input
+                type="number" min={0} max={2} step={0.1}
+                value={modelSettings.temperature ?? ""}
+                onChange={(e) => updateModelSettings({
+                  temperature: e.target.value ? Number(e.target.value) : undefined,
+                })}
+                style={{ ...styles.numberInput, width: "60px" }}
+                placeholder="기본"
+              />
+            </label>
+            <label style={styles.settingLabel}>
+              Top P:
+              <input
+                type="number" min={0} max={1} step={0.05}
+                value={modelSettings.top_p ?? ""}
+                onChange={(e) => updateModelSettings({
+                  top_p: e.target.value ? Number(e.target.value) : undefined,
+                })}
+                style={{ ...styles.numberInput, width: "60px" }}
+                placeholder="기본"
+              />
+            </label>
+            <label style={styles.settingLabel}>
+              Max Tokens:
+              <input
+                type="number" min={100} step={100}
+                value={modelSettings.max_tokens ?? ""}
+                onChange={(e) => updateModelSettings({
+                  max_tokens: e.target.value ? Number(e.target.value) : undefined,
+                })}
+                style={{ ...styles.numberInput, width: "70px" }}
+                placeholder="기본"
+              />
+            </label>
+            <label style={styles.settingLabel}>
+              Reasoning:
+              <select
+                value={modelSettings.reasoning_effort ?? ""}
+                onChange={(e) => updateModelSettings({
+                  reasoning_effort: (e.target.value || undefined) as ModelSettings["reasoning_effort"],
+                })}
+                style={styles.select}
+              >
+                <option value="">기본</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+          </div>
+        )}
+      </div>
 
       {/* Messages */}
       <div style={styles.messages}>
@@ -493,38 +540,40 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#e2e8f0",
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "12px 16px",
-    borderBottom: "1px solid #1e293b",
-    background: "#0f172a",
-  },
-  headerLeft: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  },
-  headerTitle: {
-    fontSize: "15px",
-    fontWeight: 600,
-  },
-  settingsBtn: {
-    background: "none",
-    border: "none",
-    color: "#94a3b8",
-    cursor: "pointer",
-    padding: "4px",
-  },
   settingsBar: {
     display: "flex",
-    gap: "16px",
+    flexDirection: "column",
+    gap: "6px",
     padding: "8px 16px",
     borderBottom: "1px solid #1e293b",
     background: "#0f172a",
-    fontSize: "13px",
+    fontSize: "12px",
+    flexShrink: 0,
+  },
+  settingsRow: {
+    display: "flex",
+    gap: "14px",
+    alignItems: "center",
     flexWrap: "wrap" as const,
+  },
+  settingsToggle: {
+    display: "flex",
+    alignItems: "center",
+    gap: "2px",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "11px",
+    padding: "2px 4px",
+  },
+  numberInput: {
+    background: "#1e293b",
+    color: "#e2e8f0",
+    border: "1px solid #334155",
+    borderRadius: "4px",
+    padding: "2px 6px",
+    fontSize: "12px",
+    outline: "none",
   },
   settingLabel: {
     display: "flex",

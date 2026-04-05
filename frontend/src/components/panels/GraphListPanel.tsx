@@ -19,6 +19,7 @@ import {
   Save,
   ChevronDown,
   ChevronRight,
+  MessageSquare,
 } from "lucide-react";
 import type { HassConnection } from "../../utils/haApiV2";
 import {
@@ -32,6 +33,12 @@ import {
 import type { GraphSummaryV2, GraphV2, RunResult } from "../../types_v2";
 import { GraphFlowView } from "../GraphFlowView";
 import yaml from "js-yaml";
+import {
+  MODEL_PRESETS,
+  loadModelSettings,
+  saveModelSettings,
+  type ModelSettings,
+} from "../../utils/modelSettings";
 
 interface GraphListPanelProps {
   conn: HassConnection;
@@ -150,7 +157,7 @@ export function GraphListPanel({ conn, language }: GraphListPanelProps) {
 // Graph Detail View
 // ════════════════════════════════════════
 
-type DetailMode = "flow" | "yaml" | "ai";
+type DetailMode = "flow" | "yaml";
 
 function GraphDetailView({
   conn, language, graph, onBack, onDelete, onGraphUpdated,
@@ -170,12 +177,32 @@ function GraphDetailView({
   const [runResult, setRunResult] = useState<RunResult | null>(null);
   const [running, setRunning] = useState(false);
   const [showRun, setShowRun] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(true);
+  const [editingModel, setEditingModel] = useState(false);
+  const [modelSettings] = useState<ModelSettings>(loadModelSettings);
+  const [selectedModel, setSelectedModel] = useState(graph.model || modelSettings.model);
 
   // YAML 초기화
   useEffect(() => {
     setYamlText(graphToYaml(graph));
     setYamlDirty(false);
   }, [graph]);
+
+  // 모델 변경 저장
+  const handleSaveModel = async () => {
+    setSaving(true);
+    try {
+      const updated = { ...graph, model: selectedModel };
+      const result = await saveGraphV2(conn, updated);
+      const fetched = await getGraphV2(conn, result.id);
+      onGraphUpdated(fetched);
+      setEditingModel(false);
+    } catch (err: any) {
+      alert(`모델 변경 실패: ${err.message || err}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSaveYaml = async () => {
     setSaving(true);
@@ -226,9 +253,33 @@ function GraphDetailView({
             <div style={{ fontSize: "15px", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {graph.name}
             </div>
-            <div style={{ fontSize: "11px", color: "#64748b" }}>
-              {graph.model} · {Object.keys(graph.nodes).length}개 노드
-            </div>
+            {editingModel ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  style={{ ...S.modelSelect, fontSize: "11px" }}
+                >
+                  {MODEL_PRESETS.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+                <button style={{ ...S.miniBtn, color: "#22c55e" }} onClick={handleSaveModel} disabled={saving}>
+                  <Save size={10} />
+                </button>
+                <button style={{ ...S.miniBtn, color: "#64748b" }} onClick={() => { setEditingModel(false); setSelectedModel(graph.model); }}>
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div
+                style={{ fontSize: "11px", color: "#64748b", cursor: "pointer" }}
+                onClick={() => setEditingModel(true)}
+                title="클릭하여 모델 변경"
+              >
+                {graph.model} · {Object.keys(graph.nodes).length}개 노드
+              </div>
+            )}
           </div>
         </div>
 
@@ -236,11 +287,16 @@ function GraphDetailView({
         <div style={{ display: "flex", gap: "4px" }}>
           <ModeBtn active={mode === "flow"} onClick={() => setMode("flow")} icon={<FolderOpen size={13} />} label="플로우" />
           <ModeBtn active={mode === "yaml"} onClick={() => setMode("yaml")} icon={<Code2 size={13} />} label="YAML" dirty={yamlDirty} />
-          <ModeBtn active={mode === "ai"} onClick={() => setMode("ai")} icon={<Bot size={13} />} label="AI 수정" />
         </div>
 
         {/* Actions */}
         <div style={{ display: "flex", gap: "4px", marginLeft: "8px" }}>
+          <button
+            style={{ ...S.iconBtn, color: showAiPanel ? "#60a5fa" : "#94a3b8", borderColor: showAiPanel ? "#3b82f6" : "#334155" }}
+            onClick={() => setShowAiPanel(!showAiPanel)}
+          >
+            <MessageSquare size={14} /> AI
+          </button>
           <button style={S.iconBtn} onClick={() => setShowRun(!showRun)}>
             <Play size={14} /> 실행
           </button>
@@ -275,40 +331,45 @@ function GraphDetailView({
         </div>
       )}
 
-      {/* Main content */}
+      {/* Main content — left: flow/yaml, right: AI chat */}
       <div style={S.detailContent}>
-        {mode === "flow" && (
-          <GraphFlowView graph={graph} />
-        )}
+        <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
+          {mode === "flow" && (
+            <GraphFlowView graph={graph} />
+          )}
 
-        {mode === "yaml" && (
-          <div style={S.yamlContainer}>
-            <textarea
-              value={yamlText}
-              onChange={(e) => { setYamlText(e.target.value); setYamlDirty(true); }}
-              style={S.yamlEditor}
-              spellCheck={false}
+          {mode === "yaml" && (
+            <div style={S.yamlContainer}>
+              <textarea
+                value={yamlText}
+                onChange={(e) => { setYamlText(e.target.value); setYamlDirty(true); }}
+                style={S.yamlEditor}
+                spellCheck={false}
+              />
+              {yamlDirty && (
+                <div style={S.yamlActions}>
+                  <button style={S.saveBtn} onClick={handleSaveYaml} disabled={saving}>
+                    <Save size={14} /> {saving ? "저장 중..." : "YAML 저장"}
+                  </button>
+                  <button style={S.iconBtn} onClick={() => { setYamlText(graphToYaml(graph)); setYamlDirty(false); }}>
+                    취소
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* AI side panel — always visible */}
+        {showAiPanel && (
+          <div style={S.aiSidePanel}>
+            <AiModifyPanel
+              conn={conn}
+              language={language}
+              graph={graph}
+              onGraphUpdated={onGraphUpdated}
             />
-            {yamlDirty && (
-              <div style={S.yamlActions}>
-                <button style={S.saveBtn} onClick={handleSaveYaml} disabled={saving}>
-                  <Save size={14} /> {saving ? "저장 중..." : "YAML 저장"}
-                </button>
-                <button style={S.iconBtn} onClick={() => { setYamlText(graphToYaml(graph)); setYamlDirty(false); }}>
-                  취소
-                </button>
-              </div>
-            )}
           </div>
-        )}
-
-        {mode === "ai" && (
-          <AiModifyPanel
-            conn={conn}
-            language={language}
-            graph={graph}
-            onGraphUpdated={onGraphUpdated}
-          />
         )}
       </div>
     </div>
@@ -329,6 +390,7 @@ function AiModifyPanel({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const aiModel = loadModelSettings().model;
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -350,6 +412,7 @@ function AiModifyPanel({
         current_graph: graph,
         messages: chatHistory,
         language,
+        model: aiModel,
       });
 
       setMessages((prev) => [...prev, {
@@ -602,6 +665,21 @@ const S: Record<string, React.CSSProperties> = {
     display: "flex", alignItems: "center", gap: "4px",
     background: "#1e3a5f", border: "1px solid #3b82f6", color: "#60a5fa",
     borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer",
+  },
+  // Model editing
+  modelSelect: {
+    background: "#1e293b", color: "#e2e8f0", border: "1px solid #334155",
+    borderRadius: "4px", padding: "1px 4px", outline: "none",
+  },
+  miniBtn: {
+    background: "none", border: "none", cursor: "pointer", padding: "2px", display: "flex",
+    alignItems: "center",
+  },
+  // AI side panel
+  aiSidePanel: {
+    width: "320px", minWidth: "280px", maxWidth: "400px",
+    borderLeft: "1px solid #1e293b", display: "flex", flexDirection: "column",
+    overflow: "hidden", flexShrink: 0,
   },
   // AI
   aiContainer: {
